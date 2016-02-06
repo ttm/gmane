@@ -5,7 +5,7 @@ from percolation.rdf import NS, a, po, c
 def parseLegacyFiles(data_dir=DATADIR):
     """Parse legacy txt files with irc logs"""
     directories=os.listdir(data_dir)
-    directories=[i for i in directories if i!="ipython_log.py" and not i.endswith(".swp")]
+    directories=[i for i in directories if i!="ipython_log.py" and not i.endswith(".swp") and i!="lists.pickle"]
 
     snapshots=set()
     triples=[]
@@ -16,7 +16,8 @@ def parseLegacyFiles(data_dir=DATADIR):
         expressed_reference=directory
         name_humanized="Gmane email list with id "+expressed_reference
         # get size for all files in dir
-        directorysize=sum(os.path.getsize(data_dir+directory+filename) for filename in os.listdir(data_dir+directory))/10**6
+        directorysize=sum(os.path.getsize(data_dir+directory+"/"+filename) for filename in os.listdir(data_dir+directory))/10**6
+        nfiles=len(os.listdir(data_dir+directory))
         fileformat="mbox"
         directoryuri=po.Directory+"#gmane-"+directory
         triples+=[
@@ -31,11 +32,11 @@ def parseLegacyFiles(data_dir=DATADIR):
                  (snapshoturi, po.humanizedName, name_humanized),
                  (snapshoturi, po.expressedReference, expressed_reference),
                  (snapshoturi, po.rawDirectory, directoryuri),
-                 (fileuri,     po.directorySize, directorysize),
-                 (fileuri,     po.directoryName, filename),
-                 (fileuri,     po.fileFormat, fileformat),
+                 (directoryuri,     po.directorySize, directorysize),
+                 (directoryuri,     po.directoryName, directory),
+                 (directoryuri,     po.fileFormat, fileformat),
                  ]+[
-                 (fileuri,    po.expressedClass, expressed_class) for expressed_class in expressed_classes
+                 (directoryuri,    po.expressedClass, expressed_class) for expressed_class in expressed_classes
                  ]
         snapshots.add(snapshoturi)
     nsnapshots=ndirectories=len(directories)
