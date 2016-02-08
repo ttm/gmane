@@ -12,10 +12,11 @@ def publishAll(snapshoturis=None):
                 uridict[snapshoturi]+=P.get(rawFile,NS.po.directorySize,minimized=True).toPython()
         snapshoturis.sort(key=lambda x: uridict[x])
     c("on triplification")
-    for snapshoturi in snapshoturis:
-        triplification_class=publishAny(snapshoturi)
+    triplification_classes=[]
+    for snapshoturi in list(snapshoturis):
+        triplification_classes+=[publishAny(snapshoturi)]
     #writePublishingReadme()
-    return triplification_class
+    return triplification_classes
 
 def publishAny(snapshoturi):
     # publish to umbrelladir
