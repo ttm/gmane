@@ -4,7 +4,7 @@ for key in keys:
     if "gmane" in key or "percolation" in key:
         del sys.modules[key]
 import gmane as G, percolation as P
-from percolation.rdf import NS, a, po
+from percolation.rdf import NS, a, po, c
 
 #ss=S.facebook.access.parseLegacyFiles()
 ##ss=[i for i in ss if i.endswith("gdf_fb")]
@@ -14,7 +14,10 @@ from percolation.rdf import NS, a, po
 ##ss=[i for i in ss if i.endswith("gdf_fb")]
 #last_triplification_class=S.twitter.render.publishAll(ss)
 
-ss=G.access.parseLegacyFiles()
-ss=G.access.parseLegacyFiles("/home/r/.gmane/")
+#ss=G.access.parseLegacyFiles()
+ss=G.access.parseLegacyFiles("/home/r/.gmane/"); c("finished .gmane")
+#ss.union(G.access.parseLegacyFiles("/home/r/.gmane2/")); c("finished .gmane2")
+#ss.union(G.access.parseLegacyFiles("/home/r/.gmane3/")); c("finished .gmane3")
+#ss.union(G.access.parseLegacyFiles("/home/r/.gmane4/")); c("finished .gmane4")
 #ss=[i for i in ss if i.endswith("gdf_fb")]
-last_triplification_class=G.render.publishAll(ss)
+last_triplification_class=G.render.publishAll(ss); c("finished publication of all")

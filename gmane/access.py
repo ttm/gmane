@@ -5,7 +5,7 @@ from percolation.rdf import NS, a, po, c
 def parseLegacyFiles(data_dir=DATADIR):
     """Parse legacy txt files with irc logs"""
     directories=os.listdir(data_dir)
-    directories=[i for i in directories if i!="ipython_log.py" and not i.endswith(".swp") and i!="lists.pickle"]
+    directories=[i for i in directories if os.path.isdir(data_dir+i)]
 
     snapshots=set()
     triples=[]
@@ -21,6 +21,8 @@ def parseLegacyFiles(data_dir=DATADIR):
         fileformat="mbox"
         directoryuri=po.Directory+"#gmane-"+directory
         triples+=[
+                 (snapshoturi,a,po.Snapshot),
+                 (snapshoturi,po.dataDir,data_dir),
                  (snapshoturi,a,po.Snapshot),
                  (snapshoturi,a,po.GmaneSnapshot),
                  (snapshoturi,po.snapshotID,snapshotid),
@@ -40,12 +42,12 @@ def parseLegacyFiles(data_dir=DATADIR):
                  ]
         snapshots.add(snapshoturi)
     nsnapshots=ndirectories=len(directories)
-    P.context("gmane","remove")
-    platformuri=P.rdf.ic(po.Platform,"#Gmane",context="gmane")
+    #P.context("gmane","remove")
+    platformuri=P.rdf.ic(po.Platform,"Gmane",context="gmane")
     triples+=[
              (NS.social.Session,NS.social.nGmaneParsedDirectories,ndirectories),
              (NS.social.Session,NS.social.nGmaneSnapshots,nsnapshots),
-             (platformuri, po.dataDir,data_dir),
+             (NS.social.Session,po.platform,platformuri),
              ]
     P.add(triples,context="gmane")
     c("parsed {} gmane data directories (=={} snapshots) are in percolation graph and 'gmane' context".format(ndirectories,nsnapshots))

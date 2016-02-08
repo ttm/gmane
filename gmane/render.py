@@ -11,6 +11,7 @@ def publishAll(snapshoturis=None):
             for rawFile in P.get(snapshoturi,NS.po.rawFile,strict=True,minimized=True):
                 uridict[snapshoturi]+=P.get(rawFile,NS.po.directorySize,minimized=True).toPython()
         snapshoturis.sort(key=lambda x: uridict[x])
+    c("on triplification")
     for snapshoturi in snapshoturis:
         triplification_class=publishAny(snapshoturi)
     #writePublishingReadme()
@@ -19,18 +20,10 @@ def publishAll(snapshoturis=None):
 def publishAny(snapshoturi):
     # publish to umbrelladir
     triples=[
-            (snapshoturi,      po.rawFile, "?fileurifoo"),
-            ("?fileurifoo",    po.fileName, "?filename"),
-            ]
-    filenames=P.get(triples,join_queries="list",strict=True)
-    filenames.sort()
-#    filenames=[i for i in filenames if i.count("_")==2]
-    triples=[
+            (snapshoturi,      po.dataDir, "?datadir"),
             (snapshoturi,      po.snapshotID, "?snapshotid"),
+            (snapshoturi,      po.rawDirectory, "?directoryurifoo"),
+            ("?directoryurifoo",    po.directoryName, "?directoryname"),
             ]
-    snapshotid=P.get(triples)
-    if filenames:
-        return PicklePublishing(snapshoturi,snapshotid,filenames)
-#    return snapshotid, snapshoturi, filenames
-
-
+    data_dir,directory,snapshotid=P.get(triples)
+    return MboxPublishing(snapshoturi,snapshotid,directory,data_dir)
