@@ -13,7 +13,7 @@ def publishAll(snapshoturis=None):
         snapshoturis.sort(key=lambda x: uridict[x])
     c("on triplification")
     triplification_classes=[]
-    for snapshoturi in list(snapshoturis):
+    for snapshoturi in list(snapshoturis)[:10]:
         triplification_classes+=[publishAny(snapshoturi)]
     #writePublishingReadme()
     return triplification_classes

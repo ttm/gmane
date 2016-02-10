@@ -70,36 +70,48 @@ class MboxPublishing:
                 triples+=[
                          (messageuri,po.subject,subject),
                          ]
-            if message["In-Reply-To"]:
-                saneids=self.makeId(message["In-Reply-To"])
-                if not saneids:
-                    replyid=self.snapshoturi+"-"+str(self.nlost_messages)
-                    self.nlost_messages+=1
-                    replymessageuri=P.rdf.ic(po.LostEmailMessage,replyid,self.translation_graph,self.snapshoturi)
-                    triples+=[
-                            (replymessageuri,a,po.EmailMessage),
-                            (replymessageuri,NS.rdfs.comment,"This message registered as having a reply, but the field might be ill-formed: "+message["in-reply-to"]),
-                            ]
-                else:
+            replyid_=message["In-Reply-To"]
+            saneids=self.makeId(replyid_)
+            if replyid_ or (bool(replyid_) and not bool(saneids)):
+                replyid=self.snapshoturi+"-"+str(self.nlost_messages)
+                self.nlost_messages+=1
+                replymessageuri=P.rdf.ic(po.LostEmailMessage,replyid,self.translation_graph,self.snapshoturi)
+                triples+=[
+                        (replymessageuri,a,po.EmailMessage),
+                        (replymessageuri,NS.rdfs.comment,"This message registered as having a reply, but the field might be ill-formed: "+replyid_),
+                         (messageuri,po.replyTo,replymessageuri),
+                        ]
+            elif replyid_:
                     gmaneid,replyid=saneids
                     replymessageuri=P.rdf.ic(po.EmailMessage,replyid,self.translation_graph,self.snapshoturi)
                     triples+=[
                              (replymessageuri,po.gmaneID,gmaneid),
+                             (messageuri,po.replyTo,replymessageuri),
                              ]
-                triples+=[
-                         (messageuri,po.replyTo,replymessageuri),
-                         ]
             if isinstance(message["Date"],str):
                 datetime=parseDate(message["Date"])
-                triples+=[
-                         (messageuri,po.createdAt,datetime),
-                         ]
             elif isinstance(message["Date"],mailbox.email.header.Header):
                 datetime_=re.findall(r"(.*\d\d:\d\d:\d\d).*",str(message["Date"]))[0]
                 datetime=parseDate(datetime_)
             else:
                 raise ValueError("datetime not understood")
-            references=message["References"]
+            triples+=[
+                     (messageuri,po.createdAt,datetime),
+                     ]
+            if message["References"]:
+                if not re.findall(r"\A<(.*?)>\Z",message["References"].replace("\n","")):
+                    c("::: ::: ::: references field not understood", message["References"])
+                    triples+=[
+                             (messageuri,po.comment,"the references are not understood (<.*> ids are added anyway): "+message["References"]),
+                             (messageuri,po.referencesLost,True),
+                             ]
+                for reference in re.findall(r"<(.*?)>",message["References"]):
+                    referenceid=self.snapshotid+"-"+urllib.parse.quote(reference.replace(" ",""))
+                    referenceuri=P.rdf.ic(po.EmailMessage,referenceid,self.translation_graph,self.snapshoturi)
+                    triples+=[
+                             (referenceuri,po.gmaneID,reference),
+                             (messageuri,po.hasReference,referenceuri),
+                             ]
             # get to? get other references?
             text=getText(message)
             if text:
@@ -112,7 +124,7 @@ class MboxPublishing:
                         (messageuri,po.contentType,content_type)
                         ]
             if not content_type:
-                c("/\/\/\/\/\ message without content type")
+                raise ValueError("/\/\/\/\/\ message without content type")
             mbox.close()
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
@@ -130,7 +142,7 @@ class MboxPublishing:
             fromstring=re.sub(r"(<.*)([ $]*.*)",   r"\1>\2", fromstring)
             c("-|-|-|-| corrected fromstring:", fromstring)
         if " " in fromstring and ">" in fromstring:
-            name,email=re.findall(r"(.*) <(.*)>",fromstring)[0]
+            name,email=re.findall(r"(.*) {0,1}<(.*)>",fromstring)[0]
         elif ">" in fromstring:
             email=re.findall(r"<(.*)>",fromstring)[0]
             name=None
@@ -141,18 +153,19 @@ class MboxPublishing:
         else:
             email=fromstring
             name=None
-        assert validate_email(email)
+        assert validate_email(email.replace("..","."))
         userid=self.snapshotid+"-"+email
         return email,userid,name
-
-
     def makeId(self,gmaneid):
         if isinstance(gmaneid,mailbox.email.header.Header):
             gmaneid=str(gmaneid)
-        gmaneid=re.findall(r"<(.*)>",gmaneid)
+        if not gmaneid or gmaneid.count(">")>1:
+            return None
+        if gmaneid: gmaneid=re.findall(r"<(.*)>",gmaneid)
         if not gmaneid:
             return None
-        gmaneid_=urllib.parse.quote(gmaneid[0])
+        assert len(gmaneid)==1
+        gmaneid_=urllib.parse.quote(gmaneid[0].replace(" ",""))
         id_=self.snapshotid+"-"+gmaneid_
         if not id_:
             raise ValueError("Strange id!")
