@@ -20,12 +20,13 @@ class MboxPublishing:
         P.context(meta_graph,"remove")
         final_path_="{}{}/".format(final_path,snapshotid)
         online_prefix="https://raw.githubusercontent.com/OpenLinkedSocialData/{}master/{}/".format(umbrella_dir,snapshotid)
-        nlost_messages=nurls=nreplies=nmessages=nempty=0
+        nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
         dates=[]; nchars_all=[]; ntokens_all=[]; nsentences_all=[]
         participantvars=["email","name"]
         messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nChars","nTokens","nSentences","url","emptyMessage"]
         messagevars.sort()
         files=os.listdir(data_path+directory)
+        nchars_all=[]; ntokens_all=[]; nsentences_all=[]; nchars_clean_all=[]; ntokens_clean_all=[]; nsentences_clean_all=[]
         locals_=locals().copy(); del locals_["self"]
         for i in locals_:
             exec("self.{}={}".format(i,i))
@@ -124,40 +125,59 @@ class MboxPublishing:
                 ntokens=len(k.wordpunct_tokenize(text))
                 nsentences=len(k.sent_tokenize(text))
                 triples+=[
-                        (messageuri,po.messageText,text)
-                        (messageuri,po.nChars,nchars)
-                        (messageuri,po.nTokens,ntokens)
-                        (messageuri,po.nSentences,nsentences)
-                        ]
+                         (messageuri,po.messageText,text),
+                         (messageuri,po.nChars,nchars),
+                         (messageuri,po.nTokens,ntokens),
+                         (messageuri,po.nSentences,nsentences),
+                         ]
                 self.nchars_all+=[nchars]
                 self.ntokens_all+=[ntokens]
                 self.nsentences_all+=[nsentences]
 
-                clean_text=cleanEmailMessage(text)
+                clean_text=cleanEmailBody(text)
                 nchars_clean=len(clean_text)
                 ntokens_clean=len(k.wordpunct_tokenize(clean_text))
                 nsentences_clean=len(k.sent_tokenize(clean_text))
                 triples+=[
-                        (messageuri,po.messageTextClean,clean_text)
-                        (messageuri,po.nCharsClean,nchars_clean)
-                        (messageuri,po.nTokensClean,ntokens_clean)
-                        (messageuri,po.nSentencesClean,nsentences_clean)
+                        (messageuri,po.messageTextClean,clean_text),
+                        (messageuri,po.nCharsClean,nchars_clean),
+                        (messageuri,po.nTokensClean,ntokens_clean),
+                        (messageuri,po.nSentencesClean,nsentences_clean),
                         ]
                 self.nchars_clean_all+=[nchars_clean]
                 self.ntokens_clean_all+=[ntokens_clean]
                 self.nsentences_clean_all+=[nsentences_clean]
-
             content_type=message.get_content_type()
             if content_type:
                 triples+=[
-                        (messageuri,po.contentType,content_type)
-                        ]
-            if not content_type:
+                         (messageuri,po.contentType,content_type)
+                         ]
+            else:
                 raise ValueError("/\/\/\/\/\ message without content type")
             P.add(triples,self.translation_graph)
             mbox.close()
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
+        self.totalchars=sum(self.nchars_all)
+        self.mchars_messages=n.mean(self.nchars_all)
+        self.dchars_messages=n.std(self.nchars_all)
+        self.totaltokens=sum(self.ntokens_all)
+        self.mtokens_messages=n.mean(self.ntokens_all)
+        self.dtokens_messages=n.std(self.ntokens_all)
+        self.totalsentences=sum(self.nsentences_all)
+        self.msentences_messages=n.mean(self.nsentences_all)
+        self.dsentences_messages=n.std( self.nsentences_all)
+
+        self.totalchars_clean=sum(self.nchars_clean_all)
+        self.mchars_messages_clean=n.mean(self.nchars_clean_all)
+        self.dchars_messages_clean=n.std(self.nchars_clean_all)
+        self.totaltokens_clean=sum(self.ntokens_clean_all)
+        self.mtokens_messages_clean=n.mean(self.ntokens_clean_all)
+        self.dtokens_messages_clean=n.std(self.ntokens_clean_all)
+        self.totalsentences_clean=sum(self.nsentences_clean_all)
+        self.msentences_messages_clean=n.mean(self.nsentences_clean_all)
+        self.dsentences_messages_clean=n.std( self.nsentences_clean_all)
+
         triples=[
                 (self.snapshoturi, po.nParticipants,           self.nparticipants),
                 (self.snapshoturi, po.nMessages,                 self.nmessages),
@@ -165,17 +185,24 @@ class MboxPublishing:
                 (self.snapshoturi, po.nReplies,              self.nreplies),
                 (self.snapshoturi, po.nReferences,               self.nreferences),
                 (self.snapshoturi, po.nCharsOverall, self.totalchars),
-                (self.snapshoturi, po.mCharsOverall, self.mcharsmessages),
-                (self.snapshoturi, po.dCharsOverall, self.dcharsmessages),
+                (self.snapshoturi, po.mCharsOverall, self.mchars_messages),
+                (self.snapshoturi, po.dCharsOverall, self.dchars_messages),
                 (self.snapshoturi, po.nTokensOverall, self.totaltokens),
-                (self.snapshoturi, po.mTokensOverall, self.mtokensmessages),
-                (self.snapshoturi, po.dTokensOverall, self.dtokensmessages),
-                (self.snapshoturi,  po.nCharsOverallClean,      self.totalcharsclean),
-                (self.snapshoturi,  po.mCharsOverallClean,  self.mcharsmessagesclean),
-                (self.snapshoturi,  po.dCharsOverallClean,  self.dcharsmessagesclean),
-                (self.snapshoturi, po.nTokensOverallClean,     self.totaltokensclean),
-                (self.snapshoturi, po.mTokensOverallClean, self.mtokensmessagesclean),
-                (self.snapshoturi, po.dTokensOverallClean, self.dtokensmessagesclean),
+                (self.snapshoturi, po.mTokensOverall, self.mtokens_messages),
+                (self.snapshoturi, po.dTokensOverall, self.dtokens_messages),
+                (self.snapshoturi, po.nSentencesOverall, self.totalsentences),
+                (self.snapshoturi, po.mSentencesOverall, self.msentences_messages),
+                (self.snapshoturi, po.dSentencesOverall, self.dsentences_messages),
+
+                (self.snapshoturi,  po.nCharsOverallClean,      self.totalchars_clean),
+                (self.snapshoturi,  po.mCharsOverallClean,  self.mchars_messages_clean),
+                (self.snapshoturi,  po.dCharsOverallClean,  self.dchars_messages_clean),
+                (self.snapshoturi, po.nTokensOverallClean,     self.totaltokens_clean),
+                (self.snapshoturi, po.mTokensOverallClean, self.mtokens_messages_clean),
+                (self.snapshoturi, po.dTokensOverallClean, self.dtokens_messages_clean),
+                (self.snapshoturi, po.nSentencesOverallClean,     self.totalsentences_clean),
+                (self.snapshoturi, po.mSentencesOverallClean, self.msentences_messages_clean),
+                (self.snapshoturi, po.dSentencesOverallClean, self.dsentences_messages_clean),
                 ]
         P.add(triples,context=self.meta_graph)
         P.rdf.triplesScaffolding(self.snapshoturi,
@@ -222,6 +249,74 @@ class MboxPublishing:
         P.add(triples,context=self.meta_graph)
 
     def writeAllGmane(self):
+        g=P.context(self.meta_graph)
+        ntriples=len(g)
+        triples=[
+                 (self.snapshoturi,po.nMetaTriples,ntriples)      ,
+                 ]
+        P.add(triples,context=self.meta_graph)
+        g.namespace_manager.bind("po",po)
+        g.serialize(self.final_path_+self.snapshotid+"Meta.ttl","turtle"); c("ttl")
+        g.serialize(self.final_path_+self.snapshotid+"Meta.rdf","xml")
+        c("serialized meta")
+        # copia o script que gera este codigo
+        if not os.path.isdir(self.final_path_+"scripts"):
+            os.mkdir(self.final_path_+"scripts")
+        shutil.copy(S.PACKAGEDIR+"/../tests/triplify.py",self.final_path_+"scripts/triplify.py")
+        # copia do base data
+        tinteraction="""\n\n{} individuals with metadata {}
+and {} interactions (retweets: {}, replies: {}, user_mentions: {}) 
+constitute the interaction 
+network in the RDF/XML file(s):
+{}
+and the Turtle file(s):
+{}
+(anonymized: {}).""".format( self.nparticipants,str(self.participantvars),
+                    self.nretweets+self.nreplies+self.nuser_mentions,self.nretweets,self.nreplies,self.nuser_mentions,
+                    self.tweet_rdf,
+                    self.tweet_ttl,
+                    self.interactions_anonymized)
+        tposts="""\n\nThe dataset consists of {} tweets with metadata {}
+{:.3f} characters in average (std: {:.3f}) and total chars in snapshot: {}
+{:.3f} tokens in average (std: {:.3f}) and total tokens in snapshot: {}""".format(
+                        self.ntweets,str(self.tweetvars),
+                        self.mcharstweets,self.dcharstweets,self.totalchars,
+                        self.mtokenstweets,self.dtokenstweets,self.totaltokens,
+                        )
+        self.dates=[i.isoformat() for i in self.dates]
+        date1=min(self.dates)
+        date2=max(self.dates)
+        with open(self.final_path_+"README","w") as f:
+            f.write("""::: Open Linked Social Data publication
+\nThis repository is a RDF data expression of the twitter
+snapshot {snapid} with tweets from {date1} to {date2}
+(total of {ntrip} triples).{tinteraction}{tposts}
+\nMetadata for discovery in the RDF/XML file:
+{mrdf} \nor in the Turtle file:\n{mttl}
+\nEgo network: {ise}
+Group network: {isg}
+Friendship network: {isf}
+Interaction network: {isi}
+Has text/posts: {ist}
+\nAll files should be available at the git repository:
+{ava}
+\n{desc}
+
+The script that rendered this data publication is on the script/ directory.\n:::""".format(
+                snapid=self.snapshotid,date1=date1,date2=date2,ntrip=self.ntriples,
+                        tinteraction=tinteraction,
+                        tposts=tposts,
+                        mrdf=self.mrdf,
+                        mttl=self.mttl,
+                        ise=self.isego,
+                        isg=self.isgroup,
+                        isf=self.isfriendship,
+                        isi=self.isinteraction,
+                        ist=self.hastext,
+                        ava=self.online_prefix,
+                        desc=self.desc
+                        ))
+
         pass
     def parseParticipant(self,fromstring):
         if isinstance(fromstring,mailbox.email.header.Header):
@@ -381,3 +476,37 @@ def parseDate(datetimestring):
         date=pytz.UTC.localize(date)
     return date
 
+def cleanEmailBody(text):
+#    return text
+    lines=text.splitlines()
+    lines_with_content=[line for line in t if line]
+    jump_starts=[">","<","return ", "\./","~/","//"," |","| ","On Mon","On Jan","On Tue","On Wed","On Thu","On Fri","On Sat","On Sun","From:","Subject","To","Reply-To:","WARNING","-----BEGIN","Hash: "]
+    jump_ends=["wrote: "]
+    jump_present="style=","]$","=","INFO","----"
+    jump_present_set="if","while","for",")","(","else" # >=3
+    jump_present_combo="FLAGS","="
+    relevant_lines=[]
+    for line in lines_with_content:
+        line=line.strip()
+        if sum([line.startswith(i) for i in jump_starts]):
+            pass
+        elif sum([line.endswith(i) for i in jump_ends]):
+            pass
+        elif sum([i in line for i in jump_present]):
+            pass
+        elif sum([i in line for i in jump_present_set])>=3:
+            pass
+        elif sum([i in line for i in jump_present_combo])==2:
+            pass
+        elif len(line.split()) == 1 and line[-1]!=".": # often a signature?
+            pass
+        elif line.istitle():
+            pass
+        elif line.startswith("--"):
+            break
+        elif line[:4].count("-")>=3:
+            break
+        else:
+            relevant_lines+=[line]
+    clean_text="\n".join(relevant_lines)
+    return clean_text
