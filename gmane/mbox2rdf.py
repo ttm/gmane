@@ -120,9 +120,33 @@ class MboxPublishing:
             # get to? get other references?
             text=getText(message)
             if text:
+                nchars=len(text)
+                ntokens=len(k.wordpunct_tokenize(text))
+                nsentences=len(k.sent_tokenize(text))
                 triples+=[
                         (messageuri,po.messageText,text)
+                        (messageuri,po.nChars,nchars)
+                        (messageuri,po.nTokens,ntokens)
+                        (messageuri,po.nSentences,nsentences)
                         ]
+                self.nchars_all+=[nchars]
+                self.ntokens_all+=[ntokens]
+                self.nsentences_all+=[nsentences]
+
+                clean_text=cleanEmailMessage(text)
+                nchars_clean=len(clean_text)
+                ntokens_clean=len(k.wordpunct_tokenize(clean_text))
+                nsentences_clean=len(k.sent_tokenize(clean_text))
+                triples+=[
+                        (messageuri,po.messageTextClean,clean_text)
+                        (messageuri,po.nCharsClean,nchars_clean)
+                        (messageuri,po.nTokensClean,ntokens_clean)
+                        (messageuri,po.nSentencesClean,nsentences_clean)
+                        ]
+                self.nchars_clean_all+=[nchars_clean]
+                self.ntokens_clean_all+=[ntokens_clean]
+                self.nsentences_clean_all+=[nsentences_clean]
+
             content_type=message.get_content_type()
             if content_type:
                 triples+=[
@@ -135,14 +159,68 @@ class MboxPublishing:
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
         triples=[
-                          po.gmaneID,
-                          po.nParticipants,
-                          po.nMessages,
-                          po.nResponses,
-                          po.nCharacters,
-                 ]
+                (self.snapshoturi, po.nParticipants,           self.nparticipants),
+                (self.snapshoturi, po.nMessages,                 self.nmessages),
+                (self.snapshoturi, po.nEmptyMessages,                 self.nempty),
+                (self.snapshoturi, po.nReplies,              self.nreplies),
+                (self.snapshoturi, po.nReferences,               self.nreferences),
+                (self.snapshoturi, po.nCharsOverall, self.totalchars),
+                (self.snapshoturi, po.mCharsOverall, self.mcharsmessages),
+                (self.snapshoturi, po.dCharsOverall, self.dcharsmessages),
+                (self.snapshoturi, po.nTokensOverall, self.totaltokens),
+                (self.snapshoturi, po.mTokensOverall, self.mtokensmessages),
+                (self.snapshoturi, po.dTokensOverall, self.dtokensmessages),
+                (self.snapshoturi,  po.nCharsOverallClean,      self.totalcharsclean),
+                (self.snapshoturi,  po.mCharsOverallClean,  self.mcharsmessagesclean),
+                (self.snapshoturi,  po.dCharsOverallClean,  self.dcharsmessagesclean),
+                (self.snapshoturi, po.nTokensOverallClean,     self.totaltokensclean),
+                (self.snapshoturi, po.mTokensOverallClean, self.mtokensmessagesclean),
+                (self.snapshoturi, po.dTokensOverallClean, self.dtokensmessagesclean),
+                ]
+        P.add(triples,context=self.meta_graph)
+        P.rdf.triplesScaffolding(self.snapshoturi,
+                [po.gmaneParticipantAttribute]*len(self.participantvars),
+                self.participantvars,context=self.meta_graph)
+        P.rdf.triplesScaffolding(self.snapshoturi,
+                [po.emailXMLFilename]*len(self.email_rdf)+[po.emailTTLFilename]*len(self.email_ttl),
+                self.email_rdf+self.email_ttl,context=self.meta_graph)
+        P.rdf.triplesScaffolding(self.snapshoturi,
+                [po.onlineEmailXMLFile]*len(self.email_rdf)+[po.onlineEmailTTLFile]*len(self.email_ttl),
+                [self.online_prefix+i for i in self.tweet_rdf+self.email_ttl],context=self.meta_graph)
 
-        pass
+        self.mrdf=self.snapshotid+"Meta.rdf"
+        self.mttl=self.snapshotid+"Meta.ttl"
+        self.desc="twitter dataset with snapshotID: {}\nsnapshotURI: {} \nisEgo: {}. isGroup: {}.".format(
+                                                self.snapshotid,self.snapshoturi,self.isego,self.isgroup,)
+        self.desc+="\nisFriendship: {}; ".format(self.isfriendship)
+        self.desc+="isInteraction: {}.".format(self.isinteraction)
+        self.desc+="\nnParticipants: {}; nInteractions: {} (replies+references).".format(self.nparticipants,self.nreplies+self.nreferences)
+        self.desc+="\nisPost: {} (alias hasText: {})".format(self.hastext,self.hastext)
+        self.desc+="\nnMessages: {}; ".format(self.nmessages)
+        self.desc+="nReplies: {}; nReferences: {}.".format(self.nreplies,self.nreferences)
+        self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokensmessages,self.dtokensmessages)
+        self.desc+="\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars,self.mcharsmessages,self.dcharsmessages)
+        self.desc+="\nnLinks: {}; fRemovedLines.".format(self.nlinks,fRemovedLines)
+        triples=[
+                (self.snapshoturi, po.triplifiedIn,      datetime.datetime.now()),
+                (self.snapshoturi, po.triplifiedBy,      "scripts/"),
+                (self.snapshoturi, po.donatedBy,         self.snapshotid),
+                (self.snapshoturi, po.availableAt,       self.online_prefix),
+                (self.snapshoturi, po.onlineMetaXMLFile, self.online_prefix+self.mrdf),
+                (self.snapshoturi, po.onlineMetaTTLFile, self.online_prefix+self.mttl),
+                (self.snapshoturi, po.metaXMLFileName,   self.mrdf),
+                (self.snapshoturi, po.metaTTLFileName,   self.mttl),
+                (self.snapshoturi, po.totalXMLFileSizeMB, sum(self.size_rdf)),
+                (self.snapshoturi, po.totalTTLFileSizeMB, sum(self.size_ttl)),
+                (self.snapshoturi, po.acquiredThrough,   "Gmane public mailing list archive RSS feed"),
+                (self.snapshoturi, po.socialProtocolTag, "Gmane"),
+                (self.snapshoturi, po.socialProtocol,    P.rdf.ic(po.Platform,"Gmane",self.meta_graph,self.snapshoturi)),
+                (self.snapshoturi, po.nTriples,         self.ntriples),
+                (self.snapshoturi, NS.rdfs.comment,         self.desc),
+                (self.snapshoturi, po.gmaneID, self.gmaneid),
+                ]
+        P.add(triples,context=self.meta_graph)
+
     def writeAllGmane(self):
         pass
     def parseParticipant(self,fromstring):
