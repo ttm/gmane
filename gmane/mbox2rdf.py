@@ -38,10 +38,12 @@ class MboxPublishing:
             if filecount%1000==0:
                 c(self.snapshoturi,filecount)
             mbox = mailbox.mbox(self.data_path+self.directory+"/"+file_)
-            if not mbox.keys() or not mbox[0]["Message-Id"]:
+            if not mbox.keys():
                 self.nempty+=1
                 mbox.close()
                 continue
+            if not mbox[0]["Message-Id"]:
+                raise ValueError("What to do with nonempy messages without id?")
             message=mbox[0]
             self.messages+=[message]
             gmaneid,messageid=self.makeId(message["Message-Id"])
@@ -67,20 +69,23 @@ class MboxPublishing:
                          ]
             subject=message["Subject"]
             if subject:
+                if isinstance(subject,mailbox.email.header.Header):
+                    subject="".join(i for i in str(subject) if i in string.printable)
+                assert isinstance(subject,str)
                 triples+=[
                          (messageuri,po.subject,subject),
                          ]
             replyid_=message["In-Reply-To"]
             saneids=self.makeId(replyid_)
-            if replyid_ or (bool(replyid_) and not bool(saneids)):
+            if bool(replyid_) and not bool(saneids):
                 replyid=self.snapshoturi+"-"+str(self.nlost_messages)
                 self.nlost_messages+=1
                 replymessageuri=P.rdf.ic(po.LostEmailMessage,replyid,self.translation_graph,self.snapshoturi)
                 triples+=[
-                        (replymessageuri,a,po.EmailMessage),
-                        (replymessageuri,NS.rdfs.comment,"This message registered as having a reply, but the field might be ill-formed: "+replyid_),
+                         (replymessageuri,a,po.EmailMessage),
+                         (replymessageuri,NS.rdfs.comment,"This message registered as having a reply, but the field might be ill-formed: "+replyid_),
                          (messageuri,po.replyTo,replymessageuri),
-                        ]
+                         ]
             elif replyid_:
                     gmaneid,replyid=saneids
                     replymessageuri=P.rdf.ic(po.EmailMessage,replyid,self.translation_graph,self.snapshoturi)
@@ -125,9 +130,18 @@ class MboxPublishing:
                         ]
             if not content_type:
                 raise ValueError("/\/\/\/\/\ message without content type")
+            P.add(triples,self.translation_graph)
             mbox.close()
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
+        triples=[
+                          po.gmaneID,
+                          po.nParticipants,
+                          po.nMessages,
+                          po.nResponses,
+                          po.nCharacters,
+                 ]
+
         pass
     def writeAllGmane(self):
         pass
@@ -184,24 +198,47 @@ def getText(message):
             try:
                 text=text.decode(charset)
             except LookupError:
-                c("+++ lookup error in decoding messsage:", charset)
+                c("+++ lookup error in decoding messsage; charset:", charset)
                 try:
                     text=text.decode()
                 except UnicodeDecodeError:
-                    c("+-- unicode decode error in decoding messsage:", charset)
-                    text=text.decode(errors="ignore")
+                    try:
+                        text=text.decode("latin1")
+                        c("+++ used latin1 (no errors)", charset)
+                    except UnicodeDecodeError:
+                        text=text.decode(errors="ignore")
+                        c("+-- unicode decode error in decoding messsage; used utf8 but charset:", charset)
             except UnicodeDecodeError:
                 # c(text,charset)
                 c("--- unicode error:",charset)
                 try:
-                    text=text.decode(charset,errors="ignore")
-                except LookupError:
-                    c("-++ lookup error in decoding messsage:", charset)
+                    text=text.decode("latin1")
+                    c("--- used latin1 (no errors)", charset)
+                except UnicodeDecodeError:
+                    try:
+                        text=text.decode(charset,errors="ignore")
+                        c("--+ removed errors in decoding message; charset:", charset)
+                    except LookupError:
+                        text=text.decode(errors="ignore")
+                        c("-++ lookup error in decoding messsage; used utf8 but charset:", charset)
+        else:
+#            c("*** charset is empty string or None. Might need encoding.")
+            try:
+                text=text.decode()
+            except UnicodeDecodeError:
+                try:
+                    text=text.decode("latin1")
+                    c("**+ used latin1 (no errors)", charset)
+                except UnicodeDecodeError:
                     text=text.decode(errors="ignore")
+                    c("*++ decoded with utf8 and removed errors", charset)
     elif len(charsets)==0 and text:
         text=text.decode()
     elif text:
         raise ValueError("more than one charset at the lowest payload leaf")
+    elif not text:
+        text=""
+    assert isinstance(text,str)
     content_type=message.get_content_type()
     if content_type=="text/html":
         text=''.join(bs4.BeautifulSoup(text).findAll(text=True))
@@ -214,7 +251,6 @@ def getText(message):
         text=""
         c("=== Lowest not multipart payload. Should not be translated to rdf")
         c("content_type",content_type)
-
     return text
 
 def parseDate(datetimestring):
