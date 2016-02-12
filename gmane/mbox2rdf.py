@@ -19,23 +19,29 @@ class MboxPublishing:
         P.context(translation_graph,"remove")
         P.context(meta_graph,"remove")
         final_path_="{}{}/".format(final_path,snapshotid)
+        if not os.path.isdir(final_path_):
+            os.mkdir(final_path_)
         online_prefix="https://raw.githubusercontent.com/OpenLinkedSocialData/{}master/{}/".format(umbrella_dir,snapshotid)
-        nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
+        nlines=nremoved_lines=nurls=nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
         dates=[]; nchars_all=[]; ntokens_all=[]; nsentences_all=[]
         participantvars=["email","name"]
         messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nChars","nTokens","nSentences","url","emptyMessage"]
         messagevars.sort()
         files=os.listdir(data_path+directory)
+        if not files:
+            self.comment="no files on the snapshot id"
+            return
         nchars_all=[]; ntokens_all=[]; nsentences_all=[]; nchars_clean_all=[]; ntokens_clean_all=[]; nsentences_clean_all=[]
         locals_=locals().copy(); del locals_["self"]
         for i in locals_:
             exec("self.{}={}".format(i,i))
-        self.rdfLog()
+        self.rdfMbox()
         self.makeMetadata()
         self.writeAllGmane()
-    def rdfLog(self):
+    def rdfMbox(self):
         self.messages=[]
         for filecount,file_ in enumerate(self.files):
+            c('file_:',file_)
             if filecount%1000==0:
                 c(self.snapshoturi,filecount)
             mbox = mailbox.mbox(self.data_path+self.directory+"/"+file_)
@@ -97,13 +103,22 @@ class MboxPublishing:
             if isinstance(message["Date"],str):
                 datetime=parseDate(message["Date"])
             elif isinstance(message["Date"],mailbox.email.header.Header):
-                datetime_=re.findall(r"(.*\d\d:\d\d:\d\d).*",str(message["Date"]))[0]
-                datetime=parseDate(datetime_)
+                datetimestring=str(message["Date"])
+                if False in [i in string.printable for i in datetimestring]:
+                    datetime=None
+                    triples+=[
+                             (messageuri,po.lostCreatedAt,True),
+                             ]
+                else:
+                    datetime_=re.findall(r"(.*\d\d:\d\d:\d\d).*",datetimestring)[0]
+                    datetime=parseDate(datetime_)
             else:
                 raise ValueError("datetime not understood")
-            triples+=[
-                     (messageuri,po.createdAt,datetime),
-                     ]
+            if datetime:
+                self.dates+=[datetime]
+                triples+=[
+                         (messageuri,po.createdAt,datetime),
+                         ]
             if message["References"]:
                 if not re.findall(r"\A<(.*?)>\Z",message["References"].replace("\n","")):
                     c("::: ::: ::: references field not understood", message["References"])
@@ -135,18 +150,27 @@ class MboxPublishing:
                 self.nsentences_all+=[nsentences]
 
                 clean_text=cleanEmailBody(text)
+                self.nremoved_lines+=text.count("\n")-clean_text.count("\n")
+                self.nlines+=text.count("\n")
                 nchars_clean=len(clean_text)
                 ntokens_clean=len(k.wordpunct_tokenize(clean_text))
                 nsentences_clean=len(k.sent_tokenize(clean_text))
                 triples+=[
-                        (messageuri,po.messageTextClean,clean_text),
-                        (messageuri,po.nCharsClean,nchars_clean),
-                        (messageuri,po.nTokensClean,ntokens_clean),
-                        (messageuri,po.nSentencesClean,nsentences_clean),
-                        ]
+                         (messageuri,po.messageTextClean,clean_text),
+                         (messageuri,po.nCharsClean,nchars_clean),
+                         (messageuri,po.nTokensClean,ntokens_clean),
+                         (messageuri,po.nSentencesClean,nsentences_clean),
+                         ]
                 self.nchars_clean_all+=[nchars_clean]
                 self.ntokens_clean_all+=[ntokens_clean]
                 self.nsentences_clean_all+=[nsentences_clean]
+
+                for url in re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',clean_text):
+                    self.nurls+=1
+                    triples+=[
+                             (messageuri,po.hasUrl,url),
+                             ]
+
             content_type=message.get_content_type()
             if content_type:
                 triples+=[
@@ -155,7 +179,10 @@ class MboxPublishing:
             else:
                 raise ValueError("/\/\/\/\/\ message without content type")
             P.add(triples,self.translation_graph)
+            c("added to translation graph")
             mbox.close()
+
+        self.email_xml, self.size_xml, self.email_ttl, self.size_ttl=P.rdf.writeByChunks(self.final_path_+self.snapshotid+"Email",context=self.translation_graph,ntriples=50)
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
         self.totalchars=sum(self.nchars_all)
@@ -209,12 +236,12 @@ class MboxPublishing:
                 [po.gmaneParticipantAttribute]*len(self.participantvars),
                 self.participantvars,context=self.meta_graph)
         P.rdf.triplesScaffolding(self.snapshoturi,
-                [po.emailXMLFilename]*len(self.email_rdf)+[po.emailTTLFilename]*len(self.email_ttl),
-                self.email_rdf+self.email_ttl,context=self.meta_graph)
+                [po.emailXMLFilename]*len(self.email_xml)+[po.emailTTLFilename]*len(self.email_ttl),
+                self.email_xml+self.email_ttl,context=self.meta_graph)
         P.rdf.triplesScaffolding(self.snapshoturi,
-                [po.onlineEmailXMLFile]*len(self.email_rdf)+[po.onlineEmailTTLFile]*len(self.email_ttl),
-                [self.online_prefix+i for i in self.tweet_rdf+self.email_ttl],context=self.meta_graph)
-
+                [po.onlineEmailXMLFile]*len(self.email_xml)+[po.onlineEmailTTLFile]*len(self.email_ttl),
+                [self.online_prefix+i for i in self.email_xml+self.email_ttl],context=self.meta_graph)
+        fremoved_lines=self.nremoved_lines/self.nlines
         self.mrdf=self.snapshotid+"Meta.rdf"
         self.mttl=self.snapshotid+"Meta.ttl"
         self.desc="twitter dataset with snapshotID: {}\nsnapshotURI: {} \nisEgo: {}. isGroup: {}.".format(
@@ -225,9 +252,10 @@ class MboxPublishing:
         self.desc+="\nisPost: {} (alias hasText: {})".format(self.hastext,self.hastext)
         self.desc+="\nnMessages: {}; ".format(self.nmessages)
         self.desc+="nReplies: {}; nReferences: {}.".format(self.nreplies,self.nreferences)
-        self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokensmessages,self.dtokensmessages)
-        self.desc+="\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars,self.mcharsmessages,self.dcharsmessages)
-        self.desc+="\nnLinks: {}; fRemovedLines.".format(self.nlinks,fRemovedLines)
+        self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokens_messages,self.dtokens_messages)
+        self.desc+="\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars,self.mchars_messages,self.dchars_messages)
+        self.desc+="\nnUrls: {}; fRemovedLines.".format(self.nurls,fremoved_lines)
+        self.ntriples=len(P.context(self.translation_graph))
         triples=[
                 (self.snapshoturi, po.triplifiedIn,      datetime.datetime.now()),
                 (self.snapshoturi, po.triplifiedBy,      "scripts/"),
@@ -237,14 +265,14 @@ class MboxPublishing:
                 (self.snapshoturi, po.onlineMetaTTLFile, self.online_prefix+self.mttl),
                 (self.snapshoturi, po.metaXMLFileName,   self.mrdf),
                 (self.snapshoturi, po.metaTTLFileName,   self.mttl),
-                (self.snapshoturi, po.totalXMLFileSizeMB, sum(self.size_rdf)),
+                (self.snapshoturi, po.totalXMLFileSizeMB, sum(self.size_xml)),
                 (self.snapshoturi, po.totalTTLFileSizeMB, sum(self.size_ttl)),
                 (self.snapshoturi, po.acquiredThrough,   "Gmane public mailing list archive RSS feed"),
                 (self.snapshoturi, po.socialProtocolTag, "Gmane"),
                 (self.snapshoturi, po.socialProtocol,    P.rdf.ic(po.Platform,"Gmane",self.meta_graph,self.snapshoturi)),
                 (self.snapshoturi, po.nTriples,         self.ntriples),
                 (self.snapshoturi, NS.rdfs.comment,         self.desc),
-                (self.snapshoturi, po.gmaneID, self.gmaneid),
+                (self.snapshoturi, po.gmaneID, self.directory),
                 ]
         P.add(triples,context=self.meta_graph)
 
@@ -265,23 +293,23 @@ class MboxPublishing:
         shutil.copy(S.PACKAGEDIR+"/../tests/triplify.py",self.final_path_+"scripts/triplify.py")
         # copia do base data
         tinteraction="""\n\n{} individuals with metadata {}
-and {} interactions (retweets: {}, replies: {}, user_mentions: {}) 
+and {} interactions (replies: {}, references: {}) 
 constitute the interaction 
-network in the RDF/XML file(s):
+structure in the RDF/XML file(s):
 {}
 and the Turtle file(s):
 {}
 (anonymized: {}).""".format( self.nparticipants,str(self.participantvars),
-                    self.nretweets+self.nreplies+self.nuser_mentions,self.nretweets,self.nreplies,self.nuser_mentions,
-                    self.tweet_rdf,
-                    self.tweet_ttl,
+                    self.nreplies+self.nreferences,self.nreplies,self.nreferences,
+                    self.email_xml,
+                    self.email_ttl,
                     self.interactions_anonymized)
-        tposts="""\n\nThe dataset consists of {} tweets with metadata {}
+        tposts="""\n\nThe dataset consists of {} messages with metadata {}
 {:.3f} characters in average (std: {:.3f}) and total chars in snapshot: {}
 {:.3f} tokens in average (std: {:.3f}) and total tokens in snapshot: {}""".format(
-                        self.ntweets,str(self.tweetvars),
-                        self.mcharstweets,self.dcharstweets,self.totalchars,
-                        self.mtokenstweets,self.dtokenstweets,self.totaltokens,
+                        self.nmessages,str(self.messagevars),
+                         self.mchars_messages, self.dchars_messages,self.totalchars,
+                        self.mtokens_messages,self.dtokens_messages,self.totaltokens,
                         )
         self.dates=[i.isoformat() for i in self.dates]
         date1=min(self.dates)
@@ -479,7 +507,7 @@ def parseDate(datetimestring):
 def cleanEmailBody(text):
 #    return text
     lines=text.splitlines()
-    lines_with_content=[line for line in t if line]
+    lines_with_content=[line for line in lines if line]
     jump_starts=[">","<","return ", "\./","~/","//"," |","| ","On Mon","On Jan","On Tue","On Wed","On Thu","On Fri","On Sat","On Sun","From:","Subject","To","Reply-To:","WARNING","-----BEGIN","Hash: "]
     jump_ends=["wrote: "]
     jump_present="style=","]$","=","INFO","----"
@@ -492,6 +520,10 @@ def cleanEmailBody(text):
             pass
         elif sum([line.endswith(i) for i in jump_ends]):
             pass
+        elif line.startswith("--"):
+            break
+        elif line[:4].count("-")>=3:
+            break
         elif sum([i in line for i in jump_present]):
             pass
         elif sum([i in line for i in jump_present_set])>=3:
@@ -502,10 +534,6 @@ def cleanEmailBody(text):
             pass
         elif line.istitle():
             pass
-        elif line.startswith("--"):
-            break
-        elif line[:4].count("-")>=3:
-            break
         else:
             relevant_lines+=[line]
     clean_text="\n".join(relevant_lines)
