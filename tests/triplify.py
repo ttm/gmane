@@ -15,7 +15,7 @@ from percolation.rdf import NS, a, po, c
 #last_triplification_class=S.twitter.render.publishAll(ss)
 
 #ss=G.access.parseLegacyFiles()
-ss=G.access.parseLegacyFiles("/home/r/.gmane2/"); c("finished .gmane")
+ss=G.access.parseLegacyFiles("/home/r/.gmane4/"); c("finished .gmane")
 #ss.union(G.access.parseLegacyFiles("/home/r/.gmane2/")); c("finished .gmane2")
 #ss.union(G.access.parseLegacyFiles("/home/r/.gmane3/")); c("finished .gmane3")
 #ss.union(G.access.parseLegacyFiles("/home/r/.gmane4/")); c("finished .gmane4")

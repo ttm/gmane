@@ -19,13 +19,11 @@ class MboxPublishing:
         P.context(translation_graph,"remove")
         P.context(meta_graph,"remove")
         final_path_="{}{}/".format(final_path,snapshotid)
-        if not os.path.isdir(final_path_):
-            os.mkdir(final_path_)
         online_prefix="https://raw.githubusercontent.com/OpenLinkedSocialData/{}master/{}/".format(umbrella_dir,snapshotid)
         nlines=nremoved_lines=nurls=nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
         dates=[]; nchars_all=[]; ntokens_all=[]; nsentences_all=[]
         participantvars=["email","name"]
-        messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nChars","nTokens","nSentences","url","emptyMessage"]
+        messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nCharsClean","nTokensClean","nSentencesClean","url","nChars","nTokens","nSentences","url","emptyMessage"]
         messagevars.sort()
         files=os.listdir(data_path+directory)
         if not files:
@@ -36,12 +34,16 @@ class MboxPublishing:
         for i in locals_:
             exec("self.{}={}".format(i,i))
         self.rdfMbox()
-        self.makeMetadata()
-        self.writeAllGmane()
+        if len(self.files)>self.nempty:
+            if not os.path.isdir(final_path_):
+                os.mkdir(final_path_)
+            self.email_xml, self.size_xml, self.email_ttl, self.size_ttl=P.rdf.writeByChunks(self.final_path_+self.snapshotid+"Email",context=self.translation_graph,ntriples=100000)
+            self.makeMetadata()
+            self.writeAllGmane()
     def rdfMbox(self):
         self.messages=[]
         for filecount,file_ in enumerate(self.files):
-            c('file_:',file_)
+#            c('file_:',file_)
             if filecount%1000==0:
                 c(self.snapshoturi,filecount)
             mbox = mailbox.mbox(self.data_path+self.directory+"/"+file_)
@@ -58,14 +60,21 @@ class MboxPublishing:
             if not gmaneid:
                 raise ValueError("Message without id")
             messageuri=P.rdf.ic(po.EmailMessage,messageid,self.translation_graph,self.snapshoturi)
+            self.nmessages+=1
             triples=[
                      (messageuri,po.gmaneID,gmaneid),
                      ]
             email,userid,name=self.parseParticipant(message["From"])
+            c("&&&&&&&& email,userid,name",email,userid,name,filecount,"/",len(self.files))
             #c("email",email)
             if not email:
                 raise ValueError("message without author")
             participanturi=P.rdf.ic(po.Participant,userid,self.translation_graph,self.snapshoturi)
+            if not P.get(participanturi,po.email,None,self.translation_graph):
+                c(P.get(participanturi,po.email,None,self.translation_graph),participanturi)
+                self.nparticipants+=1
+                if self.nparticipants==100:
+                    pass
             triples+=[
                      (messageuri,po.author,participanturi),
                      (participanturi,po.email,email),
@@ -85,6 +94,7 @@ class MboxPublishing:
             replyid_=message["In-Reply-To"]
             saneids=self.makeId(replyid_)
             if bool(replyid_) and not bool(saneids):
+                self.nreplies+=1
                 replyid=self.snapshoturi+"-"+str(self.nlost_messages)
                 self.nlost_messages+=1
                 replymessageuri=P.rdf.ic(po.LostEmailMessage,replyid,self.translation_graph,self.snapshoturi)
@@ -94,12 +104,13 @@ class MboxPublishing:
                          (messageuri,po.replyTo,replymessageuri),
                          ]
             elif replyid_:
-                    gmaneid,replyid=saneids
-                    replymessageuri=P.rdf.ic(po.EmailMessage,replyid,self.translation_graph,self.snapshoturi)
-                    triples+=[
-                             (replymessageuri,po.gmaneID,gmaneid),
-                             (messageuri,po.replyTo,replymessageuri),
-                             ]
+                self.nreplies+=1
+                gmaneid,replyid=saneids
+                replymessageuri=P.rdf.ic(po.EmailMessage,replyid,self.translation_graph,self.snapshoturi)
+                triples+=[
+                         (replymessageuri,po.gmaneID,gmaneid),
+                         (messageuri,po.replyTo,replymessageuri),
+                         ]
             if isinstance(message["Date"],str):
                 datetime=parseDate(message["Date"])
             elif isinstance(message["Date"],mailbox.email.header.Header):
@@ -127,6 +138,7 @@ class MboxPublishing:
                              (messageuri,po.referencesLost,True),
                              ]
                 for reference in re.findall(r"<(.*?)>",message["References"]):
+                    self.nreferences+=1
                     referenceid=self.snapshotid+"-"+urllib.parse.quote(reference.replace(" ",""))
                     referenceuri=P.rdf.ic(po.EmailMessage,referenceid,self.translation_graph,self.snapshoturi)
                     triples+=[
@@ -178,11 +190,66 @@ class MboxPublishing:
                          ]
             else:
                 raise ValueError("/\/\/\/\/\ message without content type")
-            P.add(triples,self.translation_graph)
-            c("added to translation graph")
-            mbox.close()
+            organization=message["Organization"]
+            if organization:
+                assert isinstance(organization,str)
+                triples+=[
+                         (messageuri,po.organization,organization),
+                         ]
+            cc=parseAddresses(message["cc"])
+            for peeraddress,peername in cc:
+                assert bool(peeraddress)
+                peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
+                triples+=[
+                         (messageuri,po.cc,peeruri),
+                         (peeruri,po.address,peeraddress),
+                         ]
+                if toname:
+                    triples+=[
+                             (peeruri,po.name,toname),
+                             ]
+            to=parseAddresses(message["to"])
+            for peeraddress,peername in to:
+                assert bool(peeraddress)
+                peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
+                triples+=[
+                         (messageuri,po.to,peeruri),
+                         (peeruri,po.address,peeraddress),
+                         ]
+                if toname:
+                    triples+=[
+                             (peeruri,po.name,toname),
+                             ]
+            listid=message["list-id"]
+            if listid:
+                assert isinstance(listid,str)
+                listid=listid.replace("\n","").replace("\t","")
+                if listid.count("<")==listid.count(">")==0:
+                    parts=listid.split()
+                    listid_=[i for i in parts if "@" in i][0]
+                    listname=" ".join(i for i in parts in "@" not in i)
+                elif listid.count("<")==listid.count(">")==1:
+                    listname,listid_=re.findall(r"(.*) {0,1}<(.*)>",listid)
+                else:
+                    raise ValueError("Unexpected listid string format")
+                listuri=P.rdf.ic(po.EmailList,listid_,self.translation_graph,self.snapshoturi)
+                triples+=[
+                         (messageuri,po.emailList,listuri),
+                         (listuri,po.listID,listid_),
+                         ]
+                if listname:
+                    triples+=[
+                             (listuri,po.name,listname),
+                             ]
 
-        self.email_xml, self.size_xml, self.email_ttl, self.size_ttl=P.rdf.writeByChunks(self.final_path_+self.snapshotid+"Email",context=self.translation_graph,ntriples=50)
+
+            ### pode diferir:
+            # separação por vírgula e por \n
+            # presença do <> em volta
+            # tentar aproveitar o roteiro do references
+            P.add(triples,self.translation_graph)
+#            c("added to translation graph")
+            mbox.close()
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
         self.totalchars=sum(self.nchars_all)
@@ -204,6 +271,7 @@ class MboxPublishing:
         self.totalsentences_clean=sum(self.nsentences_clean_all)
         self.msentences_messages_clean=n.mean(self.nsentences_clean_all)
         self.dsentences_messages_clean=n.std( self.nsentences_clean_all)
+        fremoved_lines=self.nremoved_lines/self.nlines
 
         triples=[
                 (self.snapshoturi, po.nParticipants,           self.nparticipants),
@@ -211,6 +279,7 @@ class MboxPublishing:
                 (self.snapshoturi, po.nEmptyMessages,                 self.nempty),
                 (self.snapshoturi, po.nReplies,              self.nreplies),
                 (self.snapshoturi, po.nReferences,               self.nreferences),
+                (self.snapshoturi, po.nUrls,               self.nurls),
                 (self.snapshoturi, po.nCharsOverall, self.totalchars),
                 (self.snapshoturi, po.mCharsOverall, self.mchars_messages),
                 (self.snapshoturi, po.dCharsOverall, self.dchars_messages),
@@ -230,6 +299,7 @@ class MboxPublishing:
                 (self.snapshoturi, po.nSentencesOverallClean,     self.totalsentences_clean),
                 (self.snapshoturi, po.mSentencesOverallClean, self.msentences_messages_clean),
                 (self.snapshoturi, po.dSentencesOverallClean, self.dsentences_messages_clean),
+                (self.snapshoturi, po.fRemovedLines, fremoved_lines),
                 ]
         P.add(triples,context=self.meta_graph)
         P.rdf.triplesScaffolding(self.snapshoturi,
@@ -241,10 +311,9 @@ class MboxPublishing:
         P.rdf.triplesScaffolding(self.snapshoturi,
                 [po.onlineEmailXMLFile]*len(self.email_xml)+[po.onlineEmailTTLFile]*len(self.email_ttl),
                 [self.online_prefix+i for i in self.email_xml+self.email_ttl],context=self.meta_graph)
-        fremoved_lines=self.nremoved_lines/self.nlines
         self.mrdf=self.snapshotid+"Meta.rdf"
         self.mttl=self.snapshotid+"Meta.ttl"
-        self.desc="twitter dataset with snapshotID: {}\nsnapshotURI: {} \nisEgo: {}. isGroup: {}.".format(
+        self.desc="gmane public email list dataset with snapshotID: {}\nsnapshotURI: {} \nisEgo: {}. isGroup: {}.".format(
                                                 self.snapshotid,self.snapshoturi,self.isego,self.isgroup,)
         self.desc+="\nisFriendship: {}; ".format(self.isfriendship)
         self.desc+="isInteraction: {}.".format(self.isinteraction)
@@ -252,8 +321,12 @@ class MboxPublishing:
         self.desc+="\nisPost: {} (alias hasText: {})".format(self.hastext,self.hastext)
         self.desc+="\nnMessages: {}; ".format(self.nmessages)
         self.desc+="nReplies: {}; nReferences: {}.".format(self.nreplies,self.nreferences)
-        self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokens_messages,self.dtokens_messages)
         self.desc+="\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars,self.mchars_messages,self.dchars_messages)
+        self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokens_messages,self.dtokens_messages)
+        self.desc+="\nnSentences: {}; mSentences: {}; dSentences: {}.".format(self.totalsentences,self.msentences_messages,self.dsentences_messages)
+        self.desc+="\nnCharsClean: {}; mCharsClean: {}; dCharsClean: {}.".format(self.totalchars_clean,self.mchars_messages_clean,self.dchars_messages_clean)
+        self.desc+="\nnTokensClean: {}; mTokensClean: {}; dTokensClean: {};".format(self.totaltokens_clean,self.mtokens_messages_clean,self.dtokens_messages_clean)
+        self.desc+="\nnSentencesClean: {}; mSentencesClean: {}; dSentencesClean: {}.".format(self.totalsentences_clean,self.msentences_messages_clean,self.dsentences_messages_clean)
         self.desc+="\nnUrls: {}; fRemovedLines.".format(self.nurls,fremoved_lines)
         self.ntriples=len(P.context(self.translation_graph))
         triples=[
@@ -316,8 +389,8 @@ and the Turtle file(s):
         date2=max(self.dates)
         with open(self.final_path_+"README","w") as f:
             f.write("""::: Open Linked Social Data publication
-\nThis repository is a RDF data expression of the twitter
-snapshot {snapid} with tweets from {date1} to {date2}
+\nThis repository is a RDF data expression of the gmane public email list with
+snapshot {snapid} with emails from {date1} to {date2}
 (total of {ntrip} triples).{tinteraction}{tposts}
 \nMetadata for discovery in the RDF/XML file:
 {mrdf} \nor in the Turtle file:\n{mttl}
@@ -356,11 +429,8 @@ The script that rendered this data publication is on the script/ directory.\n:::
         elif "<" in fromstring and ">" not in fromstring:
             fromstring=re.sub(r"(<.*)([ $]*.*)",   r"\1>\2", fromstring)
             c("-|-|-|-| corrected fromstring:", fromstring)
-        if " " in fromstring and ">" in fromstring:
+        if fromstring.count(">")==fromstring.count("<")==1:
             name,email=re.findall(r"(.*) {0,1}<(.*)>",fromstring)[0]
-        elif ">" in fromstring:
-            email=re.findall(r"<(.*)>",fromstring)[0]
-            name=None
         elif "(" in fromstring:
             email,name=re.findall(r"(.*) \((.*)\)",fromstring)[0]
         elif " " in fromstring:
@@ -368,7 +438,14 @@ The script that rendered this data publication is on the script/ directory.\n:::
         else:
             email=fromstring
             name=None
-        assert validate_email(email.replace("..","."))
+        try:
+            assert validate_email(email.replace("..","."))
+        except:
+            if "cardecovil.co.kr" in email:
+                email="foo@cardecovil.co.kr"
+                name=None
+            else:
+                raise ValueError("bad email")
         userid=self.snapshotid+"-"+email
         return email,userid,name
     def makeId(self,gmaneid):
@@ -538,3 +615,18 @@ def cleanEmailBody(text):
             relevant_lines+=[line]
     clean_text="\n".join(relevant_lines)
     return clean_text
+def parseAddresses(string_):
+    string_=string_.replace("\n","").replace("\t","")
+    candidates=[i.strip() for i in string.split(",")]
+    addresses_all=[]
+    for candidate in candidates:
+        if candidate.count("<")==candidate.count(">"):
+            # assume name <address> format
+            name,address=re.findall(r"(.*) {0.1}<(.*?)>",fromstring)
+        elif "@" in candidate:
+            address=[part for part in candidate.split() if "@" in part][0]
+            name=" ".join([part for part in candidate.split() if "@" not in part])
+        else:
+        addresses_all+=[(address,name)]
+    return addresses_all
+        
