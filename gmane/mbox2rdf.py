@@ -55,21 +55,21 @@ class MboxPublishing:
                 raise ValueError("What to do with nonempy messages without id?")
             message=mbox[0]
             self.messages+=[message]
-            gmaneid,messageid=self.makeId(message["Message-Id"])
+            gmaneid=self.makeId(message["Message-Id"])
             #c("gmaneid",gmaneid)
             if not gmaneid:
                 raise ValueError("Message without id")
-            messageuri=P.rdf.ic(po.EmailMessage,messageid,self.translation_graph,self.snapshoturi)
+            messageuri=P.rdf.ic(po.EmailMessage,gmaneid,self.translation_graph,self.snapshoturi)
             self.nmessages+=1
             triples=[
                      (messageuri,po.gmaneID,gmaneid),
                      ]
-            email,userid,name=self.parseParticipant(message["From"])
-            c("&&&&&&&& email,userid,name",email,userid,name,filecount,"/",len(self.files))
+            email,name=self.parseParticipant(message["From"])
+            c("&&&&&&&& email,userid,name",email,name,filecount,"/",len(self.files))
             #c("email",email)
             if not email:
                 raise ValueError("message without author")
-            participanturi=P.rdf.ic(po.Participant,userid,self.translation_graph,self.snapshoturi)
+            participanturi=P.rdf.ic(po.GmaneParticipant,email,self.translation_graph,self.snapshoturi)
             if not P.get(participanturi,po.email,None,self.translation_graph):
                 c(P.get(participanturi,po.email,None,self.translation_graph),participanturi)
                 self.nparticipants+=1
@@ -92,10 +92,10 @@ class MboxPublishing:
                          (messageuri,po.subject,subject),
                          ]
             replyid_=message["In-Reply-To"]
-            saneids=self.makeId(replyid_)
-            if bool(replyid_) and not bool(saneids):
+            saneid=self.makeId(replyid_)
+            if bool(replyid_) and not bool(saneid):
                 self.nreplies+=1
-                replyid=self.snapshoturi+"-"+str(self.nlost_messages)
+                replyid=self.snapshotid+"-"+str(self.nlost_messages)
                 self.nlost_messages+=1
                 replymessageuri=P.rdf.ic(po.LostEmailMessage,replyid,self.translation_graph,self.snapshoturi)
                 triples+=[
@@ -103,12 +103,11 @@ class MboxPublishing:
                          (replymessageuri,NS.rdfs.comment,"This message registered as having a reply, but the field might be ill-formed: "+replyid_),
                          (messageuri,po.replyTo,replymessageuri),
                          ]
-            elif replyid_:
+            elif saneid:
                 self.nreplies+=1
-                gmaneid,replyid=saneids
-                replymessageuri=P.rdf.ic(po.EmailMessage,replyid,self.translation_graph,self.snapshoturi)
+                replymessageuri=P.rdf.ic(po.EmailMessage,saneid,self.translation_graph,self.snapshoturi)
                 triples+=[
-                         (replymessageuri,po.gmaneID,gmaneid),
+                         (replymessageuri,po.gmaneID,saneid),
                          (messageuri,po.replyTo,replymessageuri),
                          ]
             if isinstance(message["Date"],str):
@@ -131,21 +130,28 @@ class MboxPublishing:
                          (messageuri,po.createdAt,datetime),
                          ]
             if message["References"]:
-                if not re.findall(r"\A<(.*?)>\Z",message["References"].replace("\n","")):
+                references=message["References"].replace("\n","").replace("\t","").replace(" ","")
+                if not re.findall(r"\A<(.*?)>\Z",references):
                     c("::: ::: ::: references field not understood", message["References"])
                     triples+=[
                              (messageuri,po.comment,"the references are not understood (<.*> ids are added anyway): "+message["References"]),
                              (messageuri,po.referencesLost,True),
                              ]
-                for reference in re.findall(r"<(.*?)>",message["References"]):
+                for reference in re.findall(r"<(.*?)>",references):
                     self.nreferences+=1
-                    referenceid=self.snapshotid+"-"+urllib.parse.quote(reference.replace(" ",""))
-                    referenceuri=P.rdf.ic(po.EmailMessage,referenceid,self.translation_graph,self.snapshoturi)
+                    referenceuri=P.rdf.ic(po.EmailMessage,reference,self.translation_graph,self.snapshoturi)
                     triples+=[
                              (referenceuri,po.gmaneID,reference),
                              (messageuri,po.hasReference,referenceuri),
                              ]
-            # get to? get other references?
+                for part in message["References"].replace("\n","").replace("\t","").split():
+                    if validate_email(part):
+                        self.nreferences+=1
+                        referenceuri=P.rdf.ic(po.EmailMessage,part,self.translation_graph,self.snapshoturi)
+                        triples+=[
+                                 (referenceuri,po.gmaneID,reference),
+                                 (messageuri,po.hasReference,referenceuri),
+                                 ]
             text=getText(message)
             if text:
                 nchars=len(text)
@@ -196,30 +202,32 @@ class MboxPublishing:
                 triples+=[
                          (messageuri,po.organization,organization),
                          ]
-            cc=parseAddresses(message["cc"])
-            for peeraddress,peername in cc:
-                assert bool(peeraddress)
-                peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
-                triples+=[
-                         (messageuri,po.cc,peeruri),
-                         (peeruri,po.address,peeraddress),
-                         ]
-                if toname:
+            if message["cc"]:
+                cc=parseAddresses(message["cc"])
+                for peeraddress,peername in cc:
+                    assert bool(peeraddress)
+                    peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
                     triples+=[
-                             (peeruri,po.name,toname),
+                             (messageuri,po.cc,peeruri),
+                             (peeruri,po.address,peeraddress),
                              ]
-            to=parseAddresses(message["to"])
-            for peeraddress,peername in to:
-                assert bool(peeraddress)
-                peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
-                triples+=[
-                         (messageuri,po.to,peeruri),
-                         (peeruri,po.address,peeraddress),
-                         ]
-                if toname:
+                    if peername:
+                        triples+=[
+                                 (peeruri,po.name,peername),
+                                 ]
+            if message["to"]:
+                to=parseAddresses(message["to"])
+                for peeraddress,peername in to:
+                    assert bool(peeraddress)
+                    peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
                     triples+=[
-                             (peeruri,po.name,toname),
+                             (messageuri,po.to,peeruri),
+                             (peeruri,po.address,peeraddress),
                              ]
+                    if peername:
+                        triples+=[
+                                 (peeruri,po.name,peername),
+                                 ]
             listid=message["list-id"]
             if listid:
                 assert isinstance(listid,str)
@@ -229,7 +237,7 @@ class MboxPublishing:
                     listid_=[i for i in parts if "@" in i][0]
                     listname=" ".join(i for i in parts in "@" not in i)
                 elif listid.count("<")==listid.count(">")==1:
-                    listname,listid_=re.findall(r"(.*) {0,1}<(.*)>",listid)
+                    listname,listid_=re.findall(r"(.*) {0,1}<(.*)>",listid)[0]
                 else:
                     raise ValueError("Unexpected listid string format")
                 listuri=P.rdf.ic(po.EmailList,listid_,self.translation_graph,self.snapshoturi)
@@ -418,7 +426,6 @@ The script that rendered this data publication is on the script/ directory.\n:::
                         desc=self.desc
                         ))
 
-        pass
     def parseParticipant(self,fromstring):
         if isinstance(fromstring,mailbox.email.header.Header):
             fromstring="".join(i for i in str(fromstring) if i in string.printable)
@@ -446,8 +453,8 @@ The script that rendered this data publication is on the script/ directory.\n:::
                 name=None
             else:
                 raise ValueError("bad email")
-        userid=self.snapshotid+"-"+email
-        return email,userid,name
+        return email,name
+
     def makeId(self,gmaneid):
         if isinstance(gmaneid,mailbox.email.header.Header):
             gmaneid=str(gmaneid)
@@ -457,11 +464,11 @@ The script that rendered this data publication is on the script/ directory.\n:::
         if not gmaneid:
             return None
         assert len(gmaneid)==1
-        gmaneid_=urllib.parse.quote(gmaneid[0].replace(" ",""))
-        id_=self.snapshotid+"-"+gmaneid_
-        if not id_:
+        gmaneid_=gmaneid[0].replace(" ","")
+        if not gmaneid_:
             raise ValueError("Strange id!")
-        return gmaneid[0],id_
+        return gmaneid_
+
 def getText(message):
     while message.is_multipart():
         message=message.get_payload()[0]
@@ -617,16 +624,25 @@ def cleanEmailBody(text):
     return clean_text
 def parseAddresses(string_):
     string_=string_.replace("\n","").replace("\t","")
-    candidates=[i.strip() for i in string.split(",")]
-    addresses_all=[]
-    for candidate in candidates:
-        if candidate.count("<")==candidate.count(">"):
-            # assume name <address> format
-            name,address=re.findall(r"(.*) {0.1}<(.*?)>",fromstring)
-        elif "@" in candidate:
-            address=[part for part in candidate.split() if "@" in part][0]
-            name=" ".join([part for part in candidate.split() if "@" not in part])
-        else:
-        addresses_all+=[(address,name)]
+    if string_.count("<")==string_.count(">")==1:
+        addresses_all=[re.findall(r"(.*) {0,1}<(.*?)>",string_)[0][::-1]]
+    elif string_.count("<")==string_.count(">")==0 and string_.count("@")==1:
+        address=[part for part in string_.split() if "@" in part][0]
+        name=" ".join([part for part in string_.split() if "@" not in part])
+        addresses_all=[(address,name)]
+    else:
+        candidates=re.split(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''',string_)[1::2]
+        candidates=[i.strip() for i in candidates]
+        addresses_all=[]
+        for candidate in candidates:
+            if candidate.count("<")==candidate.count(">")>0:
+                # assume name <address> format
+                name,address=re.findall(r"(.*) {0,1}<(.*?)>",candidate)[0]
+            elif "@" in candidate:
+                address=[part for part in candidate.split() if "@" in part][0]
+                name=" ".join([part for part in candidate.split() if "@" not in part])
+            else:
+                raise ValueError("Unexpected candidate string format")
+            addresses_all+=[(address,name)]
     return addresses_all
         
