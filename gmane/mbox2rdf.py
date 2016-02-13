@@ -71,7 +71,7 @@ class MboxPublishing:
                 raise ValueError("message without author")
             participanturi=P.rdf.ic(po.GmaneParticipant,email,self.translation_graph,self.snapshoturi)
             if not P.get(participanturi,po.email,None,self.translation_graph):
-                c(P.get(participanturi,po.email,None,self.translation_graph),participanturi)
+                c(P.get(participanturi,po.email,None,self.translation_graph),email,name)
                 self.nparticipants+=1
                 if self.nparticipants==100:
                     pass
@@ -203,7 +203,11 @@ class MboxPublishing:
                          (messageuri,po.organization,organization),
                          ]
             if message["cc"]:
-                cc=parseAddresses(message["cc"])
+                cc,unparsed=parseAddresses(message["cc"])
+                if unparsed:
+                    triples+=[
+                             (messageuri,po.unparsedCC,unparsed),
+                             ]
                 for peeraddress,peername in cc:
                     assert bool(peeraddress)
                     peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
@@ -216,7 +220,11 @@ class MboxPublishing:
                                  (peeruri,po.name,peername),
                                  ]
             if message["to"]:
-                to=parseAddresses(message["to"])
+                to,unparsed=parseAddresses(message["to"])
+                if unparsed:
+                    triples+=[
+                             (messageuri,po.unparsedTo,unparsed),
+                             ]
                 for peeraddress,peername in to:
                     assert bool(peeraddress)
                     peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
@@ -425,6 +433,9 @@ The script that rendered this data publication is on the script/ directory.\n:::
                         ava=self.online_prefix,
                         desc=self.desc
                         ))
+        triples=[
+                (self.snapshotid, po.published,True),
+                ]
 
     def parseParticipant(self,fromstring):
         if isinstance(fromstring,mailbox.email.header.Header):
@@ -623,7 +634,10 @@ def cleanEmailBody(text):
     clean_text="\n".join(relevant_lines)
     return clean_text
 def parseAddresses(string_):
+    if isinstance(string_,mailbox.email.header.Header):
+        string_="".join(i for i in str(string_) if i in string.printable)
     string_=string_.replace("\n","").replace("\t","")
+    unparsed=""
     if string_.count("<")==string_.count(">")==1:
         addresses_all=[re.findall(r"(.*) {0,1}<(.*?)>",string_)[0][::-1]]
     elif string_.count("<")==string_.count(">")==0 and string_.count("@")==1:
@@ -642,7 +656,9 @@ def parseAddresses(string_):
                 address=[part for part in candidate.split() if "@" in part][0]
                 name=" ".join([part for part in candidate.split() if "@" not in part])
             else:
-                raise ValueError("Unexpected candidate string format")
-            addresses_all+=[(address,name)]
-    return addresses_all
+                unparsed+=candidate
+                address=""
+            if address:
+                addresses_all+=[(address,name)]
+    return addresses_all, unparsed
         
