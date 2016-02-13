@@ -4,7 +4,7 @@ from percolation.rdf import NS, a, po, c
 
 def parseLegacyFiles(data_dir=DATADIR):
     """Parse legacy txt files with irc logs"""
-    directories=os.listdir(data_dir)
+    directories=os.listdir(os.path.expanduser(data_dir))
     directories=[i for i in directories if os.path.isdir(data_dir+i)]
 
     snapshots=set()

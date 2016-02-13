@@ -1,5 +1,5 @@
 # gmane
-the python package to expressing public email groups data from Gmane database as RDF linked data.
+the python package to express public email groups data from Gmane database as RDF linked data for the semntic web.
 
 ## core features
   - consistent downloading routines of data from email groups.
@@ -48,8 +48,6 @@ therefore Emails are downloaded one-by-one; the datetime format and other fields
 ### package structure
 Data not in RDF are kept in the data/ directory.
 Rendered RDF data should be in G.PERCOLATIONDIR="~./percolation/rdf/" unless otherwise specified.
-Each platform/protocol has an umbrella module in which are modules for accessing current data in platforms
-and expressing them as RDF.
 This package relies heavily in the percolation package to assist rendering of RDF data.
 
 
