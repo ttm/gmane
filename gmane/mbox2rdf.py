@@ -477,7 +477,8 @@ The script that rendered this data publication is on the script/ directory.\n:::
         assert len(gmaneid)==1
         gmaneid_=gmaneid[0].replace(" ","")
         if not gmaneid_:
-            raise ValueError("Strange id!")
+            return None
+            #raise ValueError("Strange id!")
         return gmaneid_
 
 def getText(message):
