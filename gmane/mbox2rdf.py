@@ -198,7 +198,8 @@ class MboxPublishing:
                 raise ValueError("/\/\/\/\/\ message without content type")
             organization=message["Organization"]
             if organization:
-                assert isinstance(organization,str)
+                if not isinstance(organization,str):
+                    organization="".join(i for i in str(organization) if i in string.printable)
                 triples+=[
                          (messageuri,po.organization,organization),
                          ]
