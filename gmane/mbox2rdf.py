@@ -44,7 +44,7 @@ class MboxPublishing:
             self.writeAllGmane()
     def rdfMbox(self):
         self.messages=[]
-        for filecount,file_ in enumerate(self.files[:500]):
+        for filecount,file_ in enumerate(self.files):
             if filecount%100==0:
                 c(self.snapshoturi,filecount)
             mbox = mailbox.mbox(self.data_path+self.directory+"/"+file_)
@@ -268,7 +268,6 @@ class MboxPublishing:
             mbox.close()
 
     def makeMetadata(self):
-        info="nEmpty: "+str(self.nempty)
         self.totalchars=sum(self.nchars_all)
         self.mchars_messages=n.mean(self.nchars_all)
         self.dchars_messages=n.std(self.nchars_all)
@@ -341,7 +340,7 @@ class MboxPublishing:
         self.desc+="isInteraction: {}.".format(self.isinteraction)
         self.desc+="\nnParticipants: {}; nInteractions: {} (replies+references+cc+to).".format(self.nparticipants,self.nreplies+self.nreferences+self.ncc+self.nto)
         self.desc+="\nisPost: {} (alias hasText: {})".format(self.hastext,self.hastext)
-        self.desc+="\nnMessages: {}; ".format(self.nmessages)
+        self.desc+="\nnMessages: {} (+ empty: {}); ".format(self.nmessages,self.nempty)
         self.desc+="nReplies: {}; nReferences: {}; nTo {}; nCC: {}.".format(self.nreplies,self.nreferences,self.ncc,self.nto)
         self.desc+="\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars,self.mchars_messages,self.dchars_messages)
         self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokens_messages,self.dtokens_messages)
@@ -456,20 +455,24 @@ The script that rendered this data publication is on the script/ directory.\n:::
         if fromstring.count(">")==fromstring.count("<")>0:
             name,email=re.findall(r"(.*) {0,1}<(.*)>",fromstring)[0]
         elif "(" in fromstring:
-            email,name=re.findall(r"(.*) \((.*)\)",fromstring)[0]
+            email,name=re.findall(r"(.*) {0,1}\((.*)\)",fromstring)[0]
         elif " " in fromstring:
             raise ValueError("new author field pattern")
         else:
             email=fromstring
             name=""
+        email=email.replace("..",".")
         try:
-            assert validate_email(email.replace("..","."))
+            assert validate_email(email)
         except:
             if "cardecovil.co.kr" in email:
                 email="foo@cardecovil.co.kr"
                 name=""
+            elif re.findall(r"(.*):(.*)",email):
+                name,email=re.findall(r"(.*):(.*)",email)[0]
             else:
                 raise ValueError("bad email")
+        assert validate_email(email)
         return email,name.strip().replace("'","").replace('"','')
 
     def makeId(self,gmaneid):
