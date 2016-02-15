@@ -31,6 +31,7 @@ class MboxPublishing:
         if not files:
             self.comment="no files on the snapshot id"
             return
+        files.sort()
         nchars_all=[]; ntokens_all=[]; nsentences_all=[]; nchars_clean_all=[]; ntokens_clean_all=[]; nsentences_clean_all=[]
         locals_=locals().copy(); del locals_["self"]
         for i in locals_:
@@ -43,7 +44,6 @@ class MboxPublishing:
             self.makeMetadata()
             self.writeAllGmane()
     def rdfMbox(self):
-        self.messages=[]
         for filecount,file_ in enumerate(self.files):
             if filecount%100==0:
                 c(self.snapshoturi,filecount)
@@ -51,12 +51,11 @@ class MboxPublishing:
             if not mbox.keys():
                 self.nempty+=1
                 mbox.close()
-                c("||||||||||| EMPTY MESSAGE |||||||||||||||||||||",self.snapshotid,file_,"(",filecount,")")
+#                c("||||||||||| EMPTY MESSAGE |||||||||||||||||||||",self.snapshotid,file_,"(",filecount,")")
                 continue
             if not mbox[0]["Message-Id"]:
                 raise ValueError("What to do with nonempy messages without id?")
             message=mbox[0]
-            self.messages+=[message]
             gmaneid=self.makeId(message["Message-Id"])
             #c("gmaneid",gmaneid)
             if not gmaneid:
