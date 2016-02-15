@@ -1,6 +1,7 @@
 import mailbox, bs4, urllib
+from email.header import decode_header
 from validate_email import validate_email
-import percolation as P, social as S, numpy as n, pickle, dateutil, nltk as k, os, datetime, shutil, rdflib as r, codecs, re, string, random, pytz
+import percolation as P, gmane as G, numpy as n, pickle, dateutil, nltk as k, os, datetime, shutil, rdflib as r, codecs, re, string, random, pytz
 from percolation.rdf import NS, U, a, po, c
 class MboxPublishing:
     def __init__(self,snapshoturi,snapshotid,directory="somedir/",\
@@ -86,7 +87,8 @@ class MboxPublishing:
             subject=message["Subject"]
             if subject:
                 if isinstance(subject,mailbox.email.header.Header):
-                    subject="".join(i for i in str(subject) if i in string.printable)
+                    subject=decodeHeader(subject)
+#                    subject="".join(i for i in str(subject) if i in string.printable)
                 assert isinstance(subject,str)
                 triples+=[
                          (messageuri,po.subject,subject),
@@ -113,7 +115,7 @@ class MboxPublishing:
             if isinstance(message["Date"],str):
                 datetime=parseDate(message["Date"])
             elif isinstance(message["Date"],mailbox.email.header.Header):
-                datetimestring=str(message["Date"])
+                datetimestring=decodeHeader(message["Date"])
                 if False in [i in string.printable for i in datetimestring]:
                     datetime=None
                     triples+=[
@@ -380,7 +382,7 @@ class MboxPublishing:
         # copia o script que gera este codigo
         if not os.path.isdir(self.final_path_+"scripts"):
             os.mkdir(self.final_path_+"scripts")
-        shutil.copy(S.PACKAGEDIR+"/../tests/triplify.py",self.final_path_+"scripts/triplify.py")
+        shutil.copy(G.PACKAGEDIR+"/../tests/triplify.py",self.final_path_+"scripts/triplify.py")
         # copia do base data
         tinteraction="""\n\n{} individuals with metadata {}
 and {} interactions (replies: {}, references: {}) 
@@ -439,9 +441,9 @@ The script that rendered this data publication is on the script/ directory.\n:::
                 ]
 
     def parseParticipant(self,fromstring):
-        if isinstance(fromstring,mailbox.email.header.Header):
-            fromstring="".join(i for i in str(fromstring) if i in string.printable)
-        fromstring=fromstring.replace("\n","").replace("\t","").replace('"',"")
+        fromstring=decodeHeader(fromstring)
+#            fromstring="".join(i for i in str(fromstring) if i in string.printable)
+        fromstring=fromstring.replace("\n","").replace("\t","")
         if ">" in fromstring and "<" not in fromstring:
             fromstring=re.sub(r"(.*[ ^]*)(.*>)",   r"\1<\2", fromstring)
             c("-|-|-|-| corrected fromstring:", fromstring)
@@ -469,7 +471,7 @@ The script that rendered this data publication is on the script/ directory.\n:::
 
     def makeId(self,gmaneid):
         if isinstance(gmaneid,mailbox.email.header.Header):
-            gmaneid=str(gmaneid)
+            gmaneid=decodeHeader(gmaneid)
         if not gmaneid or gmaneid.count(">")>1:
             return None
         if gmaneid: gmaneid=re.findall(r"<(.*)>",gmaneid)
@@ -636,8 +638,7 @@ def cleanEmailBody(text):
     clean_text="\n".join(relevant_lines)
     return clean_text
 def parseAddresses(string_):
-    if isinstance(string_,mailbox.email.header.Header):
-        string_="".join(i for i in str(string_) if i in string.printable)
+    string_=decodeHeader(string_)
     string_=string_.replace("\n","").replace("\t","")
     unparsed=""
     if string_.count("<")==string_.count(">")==1:
@@ -647,7 +648,7 @@ def parseAddresses(string_):
         name=" ".join([part for part in string_.split() if "@" not in part])
         addresses_all=[(address,name)]
     else:
-        candidates=re.split(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''',string_)[1::2]
+        candidates=re.split(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''',string_)[1::2] # ?? pra que isso?
         candidates=[i.strip() for i in candidates]
         addresses_all=[]
         for candidate in candidates:
@@ -661,6 +662,43 @@ def parseAddresses(string_):
                 unparsed+=candidate
                 address=""
             if address:
-                addresses_all+=[(address,name)]
+                try:
+                    validate_email(address)
+                    addresses_all+=[(address,name.strip())]
+                except:
+                    unparsed+=candidate
+
     return addresses_all, unparsed
         
+def decodeHeader(header):
+    decoded_header=decode_header(header)
+    final_string=""
+    c(decode_header(header))
+    c("parts:",decoded_header)
+    for i,part in enumerate(decoded_header):
+        c("->",i)
+    for part in decoded_header:
+        binary_string,codec=part
+        if "binarystring"==b'"':
+            pass
+        c("part:",part)
+        if isinstance(binary_string,str):
+            final_string+=binary_string
+            continue
+        if not codec or "unknown" in codec:
+            codec="latin1"
+        try:
+            string_=binary_string.decode(codec)
+        except:
+            try:
+                string_=binary_string.decode()
+            except:
+                try:
+                    string_=binary_string.decode(codec,errors="ignore")
+                except:
+                    try:
+                        string_=binary_string.decode(errors="ignore")
+                    except:
+                        string_="".join(i for i in str(header) if i in string.printable)
+        final_string+=string_
+    return final_string
