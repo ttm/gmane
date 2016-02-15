@@ -1,8 +1,11 @@
-import mailbox, bs4, urllib
+import mailbox, bs4, urllib, unicodedata
 from email.header import decode_header
 from validate_email import validate_email
-import percolation as P, gmane as G, numpy as n, pickle, dateutil, nltk as k, os, datetime, shutil, rdflib as r, codecs, re, string, random, pytz
+import percolation as P, gmane as G, numpy as n, pickle, dateutil.parser, nltk as k, os, datetime, shutil, rdflib as r, codecs, re, string, random, pytz
 from percolation.rdf import NS, U, a, po, c
+rstring="[{}]".format("".join(chr(i) for i in list(range(9))+list(range(11,32))+[127]))
+reclean=re.compile(rstring)
+
 class MboxPublishing:
     def __init__(self,snapshoturi,snapshotid,directory="somedir/",\
             data_path="../data/",final_path="./gmane_snapshots/",umbrella_dir="gmane_snapshotsX/"):
@@ -21,9 +24,9 @@ class MboxPublishing:
         P.context(meta_graph,"remove")
         final_path_="{}{}/".format(final_path,snapshotid)
         online_prefix="https://raw.githubusercontent.com/OpenLinkedSocialData/{}master/{}/".format(umbrella_dir,snapshotid)
-        nlines=nremoved_lines=nurls=nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
+        ncc=nto=nlines=nremoved_lines=nurls=nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
         dates=[]; nchars_all=[]; ntokens_all=[]; nsentences_all=[]
-        participantvars=["email","name"]
+        participantvars=["emailAddress","name"]
         messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nCharsClean","nTokensClean","nSentencesClean","url","nChars","nTokens","nSentences","url","emptyMessage"]
         messagevars.sort()
         files=os.listdir(data_path+directory)
@@ -43,14 +46,15 @@ class MboxPublishing:
             self.writeAllGmane()
     def rdfMbox(self):
         self.messages=[]
-        for filecount,file_ in enumerate(self.files):
+        for filecount,file_ in enumerate(self.files[:500]):
 #            c('file_:',file_)
-            if filecount%1000==0:
+            if filecount%100==0:
                 c(self.snapshoturi,filecount)
             mbox = mailbox.mbox(self.data_path+self.directory+"/"+file_)
             if not mbox.keys():
                 self.nempty+=1
                 mbox.close()
+                c("||||||||||| EMPTY MESSAGE |||||||||||||||||||||",self.snapshotid,file_,"(",filecount,")")
                 continue
             if not mbox[0]["Message-Id"]:
                 raise ValueError("What to do with nonempy messages without id?")
@@ -66,19 +70,19 @@ class MboxPublishing:
                      (messageuri,po.gmaneID,gmaneid),
                      ]
             email,name=self.parseParticipant(message["From"])
-            c("&&&&&&&& email,userid,name",email,name,filecount,"/",len(self.files))
+#            c("&&&&&&&& email,userid,name",email,name,filecount,"/",len(self.files))
             #c("email",email)
             if not email:
                 raise ValueError("message without author")
             participanturi=P.rdf.ic(po.GmaneParticipant,email,self.translation_graph,self.snapshoturi)
-            if not P.get(participanturi,po.email,None,self.translation_graph):
-                c(P.get(participanturi,po.email,None,self.translation_graph),email,name)
+            if not P.get(participanturi,po.emailAddress,None,self.translation_graph):
+#                c(P.get(participanturi,po.emailAddress,None,self.translation_graph),email,name)
                 self.nparticipants+=1
                 if self.nparticipants==100:
                     pass
             triples+=[
                      (messageuri,po.author,participanturi),
-                     (participanturi,po.email,email),
+                     (participanturi,po.emailAddress,email),
                      ]
             if name:
                 triples+=[
@@ -86,8 +90,7 @@ class MboxPublishing:
                          ]
             subject=message["Subject"]
             if subject:
-                if isinstance(subject,mailbox.email.header.Header):
-                    subject=decodeHeader(subject)
+                subject=decodeHeader(subject)
 #                    subject="".join(i for i in str(subject) if i in string.printable)
                 assert isinstance(subject,str)
                 triples+=[
@@ -185,7 +188,7 @@ class MboxPublishing:
                 self.ntokens_clean_all+=[ntokens_clean]
                 self.nsentences_clean_all+=[nsentences_clean]
 
-                for url in re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',clean_text):
+                for url in re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',clean_text):
                     self.nurls+=1
                     triples+=[
                              (messageuri,po.hasUrl,url),
@@ -212,15 +215,17 @@ class MboxPublishing:
                              (messageuri,po.unparsedCC,unparsed),
                              ]
                 for peeraddress,peername in cc:
+                    peeraddress=peeraddress.strip()
                     assert bool(peeraddress)
                     peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
                     triples+=[
                              (messageuri,po.cc,peeruri),
-                             (peeruri,po.address,peeraddress),
+                             (peeruri,po.emailAddress,peeraddress),
                              ]
+                    self.ncc+=1
                     if peername:
                         triples+=[
-                                 (peeruri,po.name,peername),
+                                 (peeruri,po.name,peername.strip()),
                                  ]
             if message["to"]:
                 to,unparsed=parseAddresses(message["to"])
@@ -229,24 +234,30 @@ class MboxPublishing:
                              (messageuri,po.unparsedTo,unparsed),
                              ]
                 for peeraddress,peername in to:
+                    peeraddress=peeraddress.strip()
                     assert bool(peeraddress)
                     peeruri=P.rdf.ic(po.EmailPeer,peeraddress,self.translation_graph,self.snapshoturi)
                     triples+=[
                              (messageuri,po.to,peeruri),
-                             (peeruri,po.address,peeraddress),
+                             (peeruri,po.emailAddress,peeraddress),
                              ]
+                    self.nto+=1
                     if peername:
                         triples+=[
-                                 (peeruri,po.name,peername),
+                                 (peeruri,po.name,peername.strip()),
                                  ]
             listid=message["list-id"]
             if listid:
                 assert isinstance(listid,str)
                 listid=listid.replace("\n","").replace("\t","")
-                if listid.count("<")==listid.count(">")==0:
+                if listid.count("<")==listid.count(">")==listid.count(" ")==0:
+                    listname=""
+                    listid_=listid
+                elif listid.count("<")==listid.count(">")==0:
                     parts=listid.split()
-                    listid_=[i for i in parts if "@" in i][0]
-                    listname=" ".join(i for i in parts in "@" not in i)
+                    lens=[len(i) for i in parts]
+                    listid_=[i for i in parts if len(i)==max(lens)][0]
+                    listname=" ".join(i for i in parts if len(i)!=max(lens))
                 elif listid.count("<")==listid.count(">")==1:
                     listname,listid_=re.findall(r"(.*) {0,1}<(.*)>",listid)[0]
                 else:
@@ -258,7 +269,7 @@ class MboxPublishing:
                          ]
                 if listname:
                     triples+=[
-                             (listuri,po.name,listname),
+                             (listuri,po.name,listname.strip()),
                              ]
 
 
@@ -297,6 +308,8 @@ class MboxPublishing:
                 (self.snapshoturi, po.nMessages,                 self.nmessages),
                 (self.snapshoturi, po.nEmptyMessages,                 self.nempty),
                 (self.snapshoturi, po.nReplies,              self.nreplies),
+                (self.snapshoturi, po.nCC,                 self.ncc),
+                (self.snapshoturi, po.nTo,              self.nto),
                 (self.snapshoturi, po.nReferences,               self.nreferences),
                 (self.snapshoturi, po.nUrls,               self.nurls),
                 (self.snapshoturi, po.nCharsOverall, self.totalchars),
@@ -336,17 +349,17 @@ class MboxPublishing:
                                                 self.snapshotid,self.snapshoturi,self.isego,self.isgroup,)
         self.desc+="\nisFriendship: {}; ".format(self.isfriendship)
         self.desc+="isInteraction: {}.".format(self.isinteraction)
-        self.desc+="\nnParticipants: {}; nInteractions: {} (replies+references).".format(self.nparticipants,self.nreplies+self.nreferences)
+        self.desc+="\nnParticipants: {}; nInteractions: {} (replies+references+cc+to).".format(self.nparticipants,self.nreplies+self.nreferences+self.ncc+self.nto)
         self.desc+="\nisPost: {} (alias hasText: {})".format(self.hastext,self.hastext)
         self.desc+="\nnMessages: {}; ".format(self.nmessages)
-        self.desc+="nReplies: {}; nReferences: {}.".format(self.nreplies,self.nreferences)
+        self.desc+="nReplies: {}; nReferences: {}; nTo {}; nCC: {}.".format(self.nreplies,self.nreferences,self.ncc,self.nto)
         self.desc+="\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars,self.mchars_messages,self.dchars_messages)
         self.desc+="\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens,self.mtokens_messages,self.dtokens_messages)
         self.desc+="\nnSentences: {}; mSentences: {}; dSentences: {}.".format(self.totalsentences,self.msentences_messages,self.dsentences_messages)
         self.desc+="\nnCharsClean: {}; mCharsClean: {}; dCharsClean: {}.".format(self.totalchars_clean,self.mchars_messages_clean,self.dchars_messages_clean)
         self.desc+="\nnTokensClean: {}; mTokensClean: {}; dTokensClean: {};".format(self.totaltokens_clean,self.mtokens_messages_clean,self.dtokens_messages_clean)
         self.desc+="\nnSentencesClean: {}; mSentencesClean: {}; dSentencesClean: {}.".format(self.totalsentences_clean,self.msentences_messages_clean,self.dsentences_messages_clean)
-        self.desc+="\nnUrls: {}; fRemovedLines.".format(self.nurls,fremoved_lines)
+        self.desc+="\nnUrls: {};  fRemovedLines {};.".format(self.nurls,fremoved_lines)
         self.ntriples=len(P.context(self.translation_graph))
         triples=[
                 (self.snapshoturi, po.triplifiedIn,      datetime.datetime.now()),
@@ -450,7 +463,7 @@ The script that rendered this data publication is on the script/ directory.\n:::
         elif "<" in fromstring and ">" not in fromstring:
             fromstring=re.sub(r"(<.*)([ $]*.*)",   r"\1>\2", fromstring)
             c("-|-|-|-| corrected fromstring:", fromstring)
-        if fromstring.count(">")==fromstring.count("<")==1:
+        if fromstring.count(">")==fromstring.count("<")>0:
             name,email=re.findall(r"(.*) {0,1}<(.*)>",fromstring)[0]
         elif "(" in fromstring:
             email,name=re.findall(r"(.*) \((.*)\)",fromstring)[0]
@@ -458,20 +471,21 @@ The script that rendered this data publication is on the script/ directory.\n:::
             raise ValueError("new author field pattern")
         else:
             email=fromstring
-            name=None
+            name=""
         try:
             assert validate_email(email.replace("..","."))
         except:
             if "cardecovil.co.kr" in email:
                 email="foo@cardecovil.co.kr"
-                name=None
+                name=""
             else:
                 raise ValueError("bad email")
-        return email,name
+        return email,name.strip().replace("'","").replace('"','')
 
     def makeId(self,gmaneid):
-        if isinstance(gmaneid,mailbox.email.header.Header):
-            gmaneid=decodeHeader(gmaneid)
+        if not gmaneid:
+            return None
+        gmaneid=decodeHeader(gmaneid)
         if not gmaneid or gmaneid.count(">")>1:
             return None
         if gmaneid: gmaneid=re.findall(r"<(.*)>",gmaneid)
@@ -551,7 +565,7 @@ def getText(message):
         text=""
         c("=== Lowest not multipart payload. Should not be translated to rdf")
         c("content_type",content_type)
-    return text
+    return reclean.sub(r"",text)
 
 def parseDate(datetimestring):
     date=datetimestring
@@ -641,47 +655,44 @@ def parseAddresses(string_):
     string_=decodeHeader(string_)
     string_=string_.replace("\n","").replace("\t","")
     unparsed=""
-    if string_.count("<")==string_.count(">")==1:
-        addresses_all=[re.findall(r"(.*) {0,1}<(.*?)>",string_)[0][::-1]]
-    elif string_.count("<")==string_.count(">")==0 and string_.count("@")==1:
-        address=[part for part in string_.split() if "@" in part][0]
-        name=" ".join([part for part in string_.split() if "@" not in part])
-        addresses_all=[(address,name)]
-    else:
-        candidates=re.split(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''',string_)[1::2] # ?? pra que isso?
-        candidates=[i.strip() for i in candidates]
-        addresses_all=[]
-        for candidate in candidates:
-            if candidate.count("<")==candidate.count(">")>0:
-                # assume name <address> format
-                name,address=re.findall(r"(.*) {0,1}<(.*?)>",candidate)[0]
-            elif "@" in candidate:
-                address=[part for part in candidate.split() if "@" in part][0]
-                name=" ".join([part for part in candidate.split() if "@" not in part])
-            else:
+    #if string_.count("<")==string_.count(">")==1:
+    #    addresses_all=[re.findall(r"(.*) {0,1}<(.*?)>",string_)[0][::-1]]
+    #elif string_.count("<")==string_.count(">")==0 and string_.count("@")==1:
+    #    address=[part for part in string_.split() if "@" in part][0]
+    #    name=" ".join([part for part in string_.split() if "@" not in part])
+    #    addresses_all=[(address,name)]
+    #else:
+    candidates=re.split(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''',string_)[1::2] # ?? pra que isso?
+    candidates=[i.strip() for i in candidates]
+    addresses_all=[]
+    for candidate in candidates:
+        if candidate.count("<")==candidate.count(">")>0:
+            # assume name <address> format
+            name,address=re.findall(r"(.*) {0,1}<(.*?)>",candidate)[0]
+        elif "@" in candidate:
+            address=[part for part in candidate.split() if "@" in part][0]
+            name=" ".join([part for part in candidate.split() if "@" not in part])
+        else:
+            unparsed+=candidate
+            address=""
+        if address:
+            try:
+                validate_email(address)
+                addresses_all+=[(address,name.strip().replace('"','').replace("'",""))]
+            except:
                 unparsed+=candidate
-                address=""
-            if address:
-                try:
-                    validate_email(address)
-                    addresses_all+=[(address,name.strip())]
-                except:
-                    unparsed+=candidate
-
     return addresses_all, unparsed
         
 def decodeHeader(header):
+    if isinstance(header,str):
+        header=header.replace("\n","")
     decoded_header=decode_header(header)
     final_string=""
-    c(decode_header(header))
-    c("parts:",decoded_header)
-    for i,part in enumerate(decoded_header):
-        c("->",i)
+    #c(decode_header(header))
     for part in decoded_header:
         binary_string,codec=part
         if "binarystring"==b'"':
             pass
-        c("part:",part)
         if isinstance(binary_string,str):
             final_string+=binary_string
             continue
@@ -701,4 +712,6 @@ def decodeHeader(header):
                     except:
                         string_="".join(i for i in str(header) if i in string.printable)
         final_string+=string_
+    if header!=final_string:
+        final_string=decodeHeader(final_string)
     return final_string
