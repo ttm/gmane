@@ -13,9 +13,9 @@ def parseLegacyFiles(data_dir=DATADIR):
     for directory in directories:
         all_files=[i for i in os.listdir(data_dir+directory) if i.isdigit()]
         all_files.sort()
-        snapshotid="gmane-legacy-"+directory+"-"+all_files[0].lstrip("0")+"-"+all_files[-1].lstrip("0")
+        snapshotid="legacy-"+directory+"-"+all_files[0].lstrip("0")+"-"+all_files[-1].lstrip("0")
         snapshoturi=po.GmaneSnapshot+"#"+snapshotid
-        expressed_classes=[po.Participant,po.EmailMessage]
+        expressed_classes=[po.GmaneParticipant,po.EmailPeer,po.EmailMessage]
         expressed_reference=directory
         name_humanized="Gmane email list with id "+expressed_reference
         # get size for all files in dir

@@ -3,8 +3,6 @@ from email.header import decode_header
 from validate_email import validate_email
 import percolation as P, gmane as G, numpy as n, pickle, dateutil.parser, nltk as k, os, datetime, shutil, rdflib as r, codecs, re, string, random, pytz
 from percolation.rdf import NS, U, a, po, c
-rstring="[{}]".format("".join(chr(i) for i in list(range(9))+list(range(11,32))+[127]))
-reclean=re.compile(rstring)
 
 class MboxPublishing:
     def __init__(self,snapshoturi,snapshotid,directory="somedir/",\
@@ -27,7 +25,7 @@ class MboxPublishing:
         ncc=nto=nlines=nremoved_lines=nurls=nlost_messages=nparticipants=nreferences=totalchars=nurls=nreplies=nmessages=nempty=0
         dates=[]; nchars_all=[]; ntokens_all=[]; nsentences_all=[]
         participantvars=["emailAddress","name"]
-        messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nCharsClean","nTokensClean","nSentencesClean","url","nChars","nTokens","nSentences","url","emptyMessage"]
+        messagevars=["author","createdAt","replyTo","messageText","cleanMessageText","nCharsClean","nTokensClean","nSentencesClean","hasUrl","nChars","nTokens","nSentences","emptyMessage","gmaneID","subject","cc","to","hasReference","contentType","organization","unparsedCC","unparsedTo","emailList"]
         messagevars.sort()
         files=os.listdir(data_path+directory)
         if not files:
@@ -47,7 +45,6 @@ class MboxPublishing:
     def rdfMbox(self):
         self.messages=[]
         for filecount,file_ in enumerate(self.files[:500]):
-#            c('file_:',file_)
             if filecount%100==0:
                 c(self.snapshoturi,filecount)
             mbox = mailbox.mbox(self.data_path+self.directory+"/"+file_)
@@ -70,13 +67,10 @@ class MboxPublishing:
                      (messageuri,po.gmaneID,gmaneid),
                      ]
             email,name=self.parseParticipant(message["From"])
-#            c("&&&&&&&& email,userid,name",email,name,filecount,"/",len(self.files))
-            #c("email",email)
             if not email:
                 raise ValueError("message without author")
             participanturi=P.rdf.ic(po.GmaneParticipant,email,self.translation_graph,self.snapshoturi)
             if not P.get(participanturi,po.emailAddress,None,self.translation_graph):
-#                c(P.get(participanturi,po.emailAddress,None,self.translation_graph),email,name)
                 self.nparticipants+=1
                 if self.nparticipants==100:
                     pass
@@ -91,7 +85,6 @@ class MboxPublishing:
             subject=message["Subject"]
             if subject:
                 subject=decodeHeader(subject)
-#                    subject="".join(i for i in str(subject) if i in string.printable)
                 assert isinstance(subject,str)
                 triples+=[
                          (messageuri,po.subject,subject),
@@ -271,15 +264,9 @@ class MboxPublishing:
                     triples+=[
                              (listuri,po.name,listname.strip()),
                              ]
-
-
-            ### pode diferir:
-            # separação por vírgula e por \n
-            # presença do <> em volta
-            # tentar aproveitar o roteiro do references
             P.add(triples,self.translation_graph)
-#            c("added to translation graph")
             mbox.close()
+
     def makeMetadata(self):
         info="nEmpty: "+str(self.nempty)
         self.totalchars=sum(self.nchars_all)
@@ -337,6 +324,9 @@ class MboxPublishing:
         P.rdf.triplesScaffolding(self.snapshoturi,
                 [po.gmaneParticipantAttribute]*len(self.participantvars),
                 self.participantvars,context=self.meta_graph)
+        P.rdf.triplesScaffolding(self.snapshoturi,
+                [po.gmaneMessageAttribute]*len(self.messagevars),
+                self.messagevars,context=self.meta_graph)
         P.rdf.triplesScaffolding(self.snapshoturi,
                 [po.emailXMLFilename]*len(self.email_xml)+[po.emailTTLFilename]*len(self.email_ttl),
                 self.email_xml+self.email_ttl,context=self.meta_graph)
@@ -398,14 +388,14 @@ class MboxPublishing:
         shutil.copy(G.PACKAGEDIR+"/../tests/triplify.py",self.final_path_+"scripts/triplify.py")
         # copia do base data
         tinteraction="""\n\n{} individuals with metadata {}
-and {} interactions (replies: {}, references: {}) 
+and {} interactions (replies: {}, references: {}, to: {}, cc: {}) 
 constitute the interaction 
 structure in the RDF/XML file(s):
 {}
 and the Turtle file(s):
 {}
 (anonymized: {}).""".format( self.nparticipants,str(self.participantvars),
-                    self.nreplies+self.nreferences,self.nreplies,self.nreferences,
+                    self.nreplies+self.nreferences+self.ncc+self.nto,self.nreplies,self.nreferences,self.nto,self.ncc,
                     self.email_xml,
                     self.email_ttl,
                     self.interactions_anonymized)
@@ -565,7 +555,7 @@ def getText(message):
         text=""
         c("=== Lowest not multipart payload. Should not be translated to rdf")
         c("content_type",content_type)
-    return reclean.sub(r"",text)
+    return P.utils.cleanText(text)
 
 def parseDate(datetimestring):
     date=datetimestring
