@@ -89,8 +89,7 @@ class MboxPublishing:
                 mbox.close()
                 # c("||||||||||| EMPTY MESSAGE |||||||||||||||||||||", self.snapshotid, file_, "(", filecount, ")")
                 continue
-            if not mbox[0]["Message-Id"]:
-                raise ValueError("What to do with nonempy messages without id?")
+            assert mbox[0]["Message-Id"], "What to do with nonempy messages without id?"
             message = mbox[0]
             self.messages += [message]
             gmaneid = self.makeId(message["Message-Id"])
@@ -106,175 +105,151 @@ class MboxPublishing:
             if not email:
                 raise ValueError("message without author")
             participanturi = P.rdf.ic(po.GmaneParticipant, email, self.translation_graph, self.snapshoturi)
-            if not P.get(participanturi, po.emailAddress, None, self.translation_graph):
-                self.nparticipants += 1
-                if self.nparticipants == 100:
-                    pass
-            triples += [
+            # if not P.get(participanturi, po.emailAddress, None, self.translation_graph):
+            #     self.nparticipants += 1
+            #     if self.nparticipants == 100:
+            #         pass
+            triples.extend((
                      (messageuri, po.author, participanturi),
                      (participanturi, po.emailAddress, email),
-                     ]
+            ))
             if name:
-                triples += [
-                         (participanturi, po.name, name),
-                         ]
+                triples.append((participanturi, po.name, name))
             subject = message["Subject"]
             if subject:
                 subject = decodeHeader(subject)
                 assert isinstance(subject, str)
-                triples += [
-                         (messageuri, po.subject, subject),
-                         ]
+                triples.append((messageuri, po.subject, subject))
             replyid_ = message["In-Reply-To"]
             saneid = self.makeId(replyid_)
             if bool(replyid_) and not bool(saneid):
-                self.nreplies += 1
+                # self.nreplies += 1
                 replyid = self.snapshotid+"-"+str(self.nlost_messages)
                 self.nlost_messages += 1
                 replymessageuri = P.rdf.ic(po.LostEmailMessage, replyid, self.translation_graph, self.snapshoturi)
-                triples += [
+                triples.extend((
                          (replymessageuri, a, po.EmailMessage),
                          (replymessageuri, NS.rdfs.comment, "This message registered as having a reply,  but the field might be ill-formed: "+replyid_),
                          (messageuri, po.replyTo, replymessageuri),
-                         ]
+                ))
             elif saneid:
-                self.nreplies += 1
+                # self.nreplies += 1
                 replymessageuri = P.rdf.ic(po.EmailMessage, saneid, self.translation_graph, self.snapshoturi)
-                triples += [
+                triples.extend((
                          (replymessageuri, po.gmaneID, saneid),
                          (messageuri, po.replyTo, replymessageuri),
-                         ]
+                ))
             if isinstance(message["Date"], str):
                 datetime = parseDate(message["Date"])
             elif isinstance(message["Date"], mailbox.email.header.Header):
                 datetimestring = decodeHeader(message["Date"])
                 if False in [i in string.printable for i in datetimestring]:
                     datetime = None
-                    triples += [
-                             (messageuri, po.lostCreatedAt, True),
-                             ]
+                    triples.append((messageuri, po.lostCreatedAt, True))
                 else:
                     datetime_ = re.findall(r"(.*\d\d:\d\d:\d\d).*", datetimestring)[0]
                     datetime = parseDate(datetime_)
             else:
                 raise ValueError("datetime not understood")
             if datetime:
-                self.dates += [datetime]
-                triples += [
-                         (messageuri, po.createdAt, datetime),
-                         ]
+                # self.dates += [datetime]
+                triples.append((messageuri, po.createdAt, datetime))
             if message["References"]:
                 references = message["References"].replace("\n", "").replace("\t", "").replace(" ", "")
                 if not re.findall(r"\A<(.*?)>\Z", references):
                     c("::: ::: ::: references field not understood",  message["References"])
-                    triples += [
+                    triples.extend((
                              (messageuri, po.comment, "the references are not understood (<.*> ids are added anyway): "+message["References"]),
                              (messageuri, po.referencesLost, True),
-                             ]
+                    ))
                 for reference in re.findall(r"<(.*?)>", references):
                     self.nreferences += 1
                     referenceuri = P.rdf.ic(po.EmailMessage, reference, self.translation_graph, self.snapshoturi)
-                    triples += [
+                    triples.extend((
                              (referenceuri, po.gmaneID, reference),
                              (messageuri, po.hasReference, referenceuri),
-                             ]
+                    ))
                 for part in message["References"].replace("\n", "").replace("\t", "").split():
                     if validate_email(part):
                         self.nreferences += 1
                         referenceuri = P.rdf.ic(po.EmailMessage, part, self.translation_graph, self.snapshoturi)
-                        triples += [
+                        triples.extend((
                                  (referenceuri, po.gmaneID, reference),
                                  (messageuri, po.hasReference, referenceuri),
-                                 ]
+                        ))
             text = getText(message)
             if text:
                 nchars = len(text)
-                ntokens = len(k.wordpunct_tokenize(text))
-                nsentences = len(k.sent_tokenize(text))
-                triples += [
+                # ntokens = len(k.wordpunct_tokenize(text))
+                # nsentences = len(k.sent_tokenize(text))
+                self.nchars_all += [nchars]
+                # self.ntokens_all += [ntokens]
+                # self.nsentences_all += [nsentences]
+                triples.extend((
                          (messageuri, po.messageText, text),
                          (messageuri, po.nChars, nchars),
-                         (messageuri, po.nTokens, ntokens),
-                         (messageuri, po.nSentences, nsentences),
-                         ]
-                self.nchars_all += [nchars]
-                self.ntokens_all += [ntokens]
-                self.nsentences_all += [nsentences]
-
+                         # (messageuri, po.nTokens, ntokens),
+                         # (messageuri, po.nSentences, nsentences),
+                ))
                 clean_text = cleanEmailBody(text)
-                self.nremoved_lines += text.count("\n")-clean_text.count("\n")
+                # self.nremoved_lines += text.count("\n")-clean_text.count("\n")
                 self.nlines += text.count("\n")
                 nchars_clean = len(clean_text)
-                ntokens_clean = len(k.wordpunct_tokenize(clean_text))
-                nsentences_clean = len(k.sent_tokenize(clean_text))
-                triples += [
+                # ntokens_clean = len(k.wordpunct_tokenize(clean_text))
+                # nsentences_clean = len(k.sent_tokenize(clean_text))
+                self.nchars_clean_all.append(nchars_clean)
+                # self.ntokens_clean_all += [ntokens_clean]
+                # self.nsentences_clean_all += [nsentences_clean]
+                triples.extend((
                          (messageuri, po.messageTextClean, clean_text),
                          (messageuri, po.nCharsClean, nchars_clean),
-                         (messageuri, po.nTokensClean, ntokens_clean),
-                         (messageuri, po.nSentencesClean, nsentences_clean),
-                         ]
-                self.nchars_clean_all += [nchars_clean]
-                self.ntokens_clean_all += [ntokens_clean]
-                self.nsentences_clean_all += [nsentences_clean]
+                         # (messageuri, po.nTokensClean, ntokens_clean),
+                         # (messageuri, po.nSentencesClean, nsentences_clean),
+                ))
 
                 for url in re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\), ]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', clean_text):
                     self.nurls += 1
-                    triples += [
-                             (messageuri, po.hasUrl, url),
-                             ]
-
+                    triples.append((messageuri, po.hasUrl, url))
             content_type = message.get_content_type()
             if content_type:
-                triples += [
-                         (messageuri, po.contentType, content_type)
-                         ]
+                triples.append((messageuri, po.contentType, content_type))
             else:
                 raise ValueError("/\/\/\/\/\ message without content type")
             organization = message["Organization"]
             if organization:
                 if not isinstance(organization, str):
                     organization = "".join(i for i in str(organization) if i in string.printable)
-                triples += [
-                         (messageuri, po.organization, organization),
-                         ]
+                triples.append((messageuri, po.organization, organization))
             if message["cc"]:
                 cc, unparsed = parseAddresses(message["cc"])
                 if unparsed:
-                    triples += [
-                             (messageuri, po.unparsedCC, unparsed),
-                             ]
+                    triples.append((messageuri, po.unparsedCC, unparsed))
                 for peeraddress, peername in cc:
                     peeraddress = peeraddress.strip()
                     assert bool(peeraddress)
                     peeruri = P.rdf.ic(po.EmailPeer, peeraddress, self.translation_graph, self.snapshoturi)
-                    triples += [
+                    triples.extend((
                              (messageuri, po.cc, peeruri),
                              (peeruri, po.emailAddress, peeraddress),
-                             ]
+                    ))
                     self.ncc += 1
                     if peername:
-                        triples += [
-                                 (peeruri, po.name, peername.strip()),
-                                 ]
+                        triples.append((peeruri, po.name, peername.strip()))
             if message["to"]:
                 to, unparsed = parseAddresses(message["to"])
                 if unparsed:
-                    triples += [
-                             (messageuri, po.unparsedTo, unparsed),
-                             ]
+                    triples.append((messageuri, po.unparsedTo, unparsed))
                 for peeraddress, peername in to:
                     peeraddress = peeraddress.strip()
                     assert bool(peeraddress)
                     peeruri = P.rdf.ic(po.EmailPeer, peeraddress, self.translation_graph, self.snapshoturi)
-                    triples += [
+                    triples.extend((
                              (messageuri, po.to, peeruri),
                              (peeruri, po.emailAddress, peeraddress),
-                             ]
+                    ))
                     self.nto += 1
                     if peername:
-                        triples += [
-                                 (peeruri, po.name, peername.strip()),
-                                 ]
+                        triples.append((peeruri, po.name, peername.strip()))
             listid = message["list-id"]
             if listid:
                 assert isinstance(listid, str)
@@ -288,18 +263,16 @@ class MboxPublishing:
                     listid_ = [i for i in parts if len(i) == max(lens)][0]
                     listname = " ".join(i for i in parts if len(i) != max(lens))
                 elif listid.count("<") == listid.count(">") == 1:
-                    listname, listid_ = re.findall(r"(.*) {0, 1}<(.*)>", listid)[0]
+                    listname, listid_ = re.findall(r"(.*) {0,1}<(.*)>", listid)[0]
                 else:
                     raise ValueError("Unexpected listid string format")
                 listuri = P.rdf.ic(po.EmailList, listid_, self.translation_graph, self.snapshoturi)
-                triples += [
+                triples.extend((
                          (messageuri, po.emailList, listuri),
                          (listuri, po.listID, listid_),
-                         ]
+                ))
                 if listname:
-                    triples += [
-                             (listuri, po.name, listname.strip()),
-                             ]
+                    triples.append((listuri, po.name, listname.strip()))
             P.add(triples, self.translation_graph)
             mbox.close()
 
@@ -443,9 +416,9 @@ and the Turtle file(s):
                         self.mchars_messages, self.dchars_messages, self.totalchars,
                         self.mtokens_messages, self.dtokens_messages, self.totaltokens,
                         )
-        self.dates = [i.isoformat() for i in self.dates]
-        date1 = min(self.dates)
-        date2 = max(self.dates)
+        # self.dates = [i.isoformat() for i in self.dates]
+        date1 = 0 # min(self.dates)
+        date2 = 0 # max(self.dates)
         with open(self.final_path_+"README", "w") as f:
             f.write("""::: Open Linked Social Data publication
 \nThis repository is a RDF data expression of the gmane public email list with
@@ -491,9 +464,9 @@ The script that rendered this data publication is on the script/ directory.\n:::
             fromstring = re.sub(r"(<.*)([ $]*.*)",   r"\1>\2", fromstring)
             c("-|-|-|-| corrected fromstring:", fromstring)
         if fromstring.count(">") == fromstring.count("<") > 0:
-            name, email = re.findall(r"(.*) {0, 1}<(.*)>", fromstring)[0]
+            name, email = re.findall(r"(.*?) {0,1}<(.*?)>", fromstring)[0]
         elif "(" in fromstring:
-            email, name = re.findall(r"(.*) {0, 1}\((.*)\)", fromstring)[0]
+            email, name = re.findall(r"(.*?) {0,1}\((.*)\)", fromstring)[0]
         elif " " in fromstring:
             raise ValueError("new author field pattern")
         else:
@@ -506,6 +479,9 @@ The script that rendered this data publication is on the script/ directory.\n:::
             if "cardecovil.co.kr" in email:
                 email = "foo@cardecovil.co.kr"
                 name = ""
+            elif 'akinobu.mita"@gmail.com' == email:
+                email = 'akinobu.mita@gmail.com'
+                name = ''
             elif re.findall(r"(.*):(.*)", email):
                 name, email = re.findall(r"(.*):(.*)", email)[0]
             else:
@@ -628,12 +604,12 @@ def parseDate(datetimestring):
         date = dateutil.parser.parse(date)
 
     except ValueError:
-        usual_pattern = re.findall(r"(.*?) {0, 1}\(.*\)$", date)
+        usual_pattern = re.findall(r"(.*?) {0,1}\(.*\)$", date)
         if usual_pattern:
             assert len(usual_pattern) == 1
             date = usual_pattern[0]
-        elif re.findall(r"(.*) [A-Z]{3, 4}$", date):
-            date = re.findall(r"(.*) [A-Z]{3, 4}$", date)[0]
+        elif re.findall(r"(.*) [A-Z]{3,4}$", date):
+            date = re.findall(r"(.*) [A-Z]{3,4}$", date)[0]
         elif re.findall(r"\d{2} \d{4}$", date):
             date = date.replace(date[-4:], "+"+date[-4:])
         else:

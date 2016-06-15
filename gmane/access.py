@@ -4,7 +4,7 @@ from percolation.rdf import NS, a, po, c
 
 
 def parseLegacyFiles(data_dir=DATADIR):
-    """Parse legacy txt files with irc logs"""
+    """Parse legacy mbox files with emails from the Gmane database"""
     data_dir = os.path.expanduser(data_dir)
     directories = os.listdir(data_dir)
     directories = [i for i in directories if os.path.isdir(data_dir+i)]
@@ -22,16 +22,13 @@ def parseLegacyFiles(data_dir=DATADIR):
             expressed_classes = [po.GmaneParticipant, po.EmailPeer, po.EmailMessage]
             expressed_reference = directory
             name_humanized = "Gmane email list with id "+expressed_reference
-            # get size for all files in dir
             directorysize = sum(os.path.getsize(data_dir+directory+"/"+filename) for filename in os.listdir(data_dir+directory))/10**6
-            # nfiles = len(all_files)
             fileformat = "mbox"
             directoryuri = po.Directory+"#gmane-"+directory
-            triples += [
-                     (snapshoturi, a, po.Snapshot),
-                     (snapshoturi, po.dataDir, data_dir),
+            triples.extend([
                      (snapshoturi, a, po.Snapshot),
                      (snapshoturi, a, po.GmaneSnapshot),
+                     (snapshoturi, po.dataDir, data_dir),
                      (snapshoturi, po.snapshotID, snapshotid),
                      (snapshoturi, po.isEgo, False),
                      (snapshoturi, po.isGroup, True),
@@ -46,16 +43,16 @@ def parseLegacyFiles(data_dir=DATADIR):
                      (directoryuri,     po.fileFormat, fileformat),
                      ]+[
                      (directoryuri,    po.expressedClass, expressed_class) for expressed_class in expressed_classes
-                     ]
+                     ])
             snapshots.add(snapshoturi)
     nsnapshots = ndirectories = len(directories)
-    # P.context("gmane","remove")
+    P.context("gmane", "remove")
     platformuri = P.rdf.ic(po.Platform, "Gmane", context="gmane")
-    triples += [
+    triples.extend([
              (NS.social.Session, NS.social.nGmaneParsedDirectories, ndirectories),
              (NS.social.Session, NS.social.nGmaneSnapshots, nsnapshots),
              (NS.social.Session, po.platform, platformuri),
-             ]
+    ])
     P.add(triples, context="gmane")
     c("parsed {} gmane data directories (=={} snapshots) are in percolation graph and 'gmane' context".format(ndirectories, nsnapshots))
     c("percolation graph have {} triples ({} in gmane context)".format(len(P.percolation_graph), len(P.context("gmane"))))
