@@ -58,6 +58,7 @@ class MboxPublishing:
         if not files:
             self.comment = "no files on the snapshot id"
             return
+        files.sort()
         nchars_all = []
         ntokens_all = []
         nsentences_all = []
@@ -86,7 +87,7 @@ class MboxPublishing:
             if not mbox.keys():
                 self.nempty += 1
                 mbox.close()
-                c("||||||||||| EMPTY MESSAGE |||||||||||||||||||||", self.snapshotid, file_, "(", filecount, ")")
+                # c("||||||||||| EMPTY MESSAGE |||||||||||||||||||||", self.snapshotid, file_, "(", filecount, ")")
                 continue
             if not mbox[0]["Message-Id"]:
                 raise ValueError("What to do with nonempy messages without id?")
