@@ -1,4 +1,5 @@
 from gmane import DATADIR, os
+import re
 import percolation as P
 from percolation.rdf import NS, a, po, c
 
@@ -17,7 +18,7 @@ def parseLegacyFiles(data_dir=DATADIR):
             foo = all_files[0].lstrip("0")
             if not foo:
                 foo = "0"
-            snapshotid = "legacy-"+directory+"-"+foo+"-"+all_files[-1].lstrip("0")
+            snapshotid = re.sub('^gmane', 'gmane-legacy-', directory)+foo+"-"+all_files[-1].lstrip("0")
             snapshoturi = po.GmaneSnapshot+"#"+snapshotid
             expressed_classes = [po.GmaneParticipant, po.EmailPeer, po.EmailMessage]
             expressed_reference = directory

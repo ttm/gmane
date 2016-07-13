@@ -104,7 +104,7 @@ class MboxPublishing:
             email, name = self.parseParticipant(message["From"])
             if not email:
                 raise ValueError("message without author")
-            participanturi = P.rdf.ic(po.GmaneParticipant, email, self.translation_graph, self.snapshoturi)
+            participanturi = P.rdf.ic(po.Participant, email, self.translation_graph, self.snapshoturi)
             # if not P.get(participanturi, po.emailAddress, None, self.translation_graph):
             #     self.nparticipants += 1
             #     if self.nparticipants == 100:
@@ -382,6 +382,7 @@ class MboxPublishing:
 
     def writeAllGmane(self):
         g = P.context(self.meta_graph)
+        g.namespace_manager.bind("po", po)
         ntriples = len(g)
         triples = [
                  (self.snapshoturi, po.nMetaTriples, ntriples),
@@ -403,7 +404,7 @@ constitute the interaction
 structure in the RDF/XML file(s):
 {}
 and the Turtle file(s):
-{}
+    {}
 (anonymized: {}).""".format(self.nparticipants, str(self.participantvars),
                             self.nreplies+self.nreferences+self.ncc+self.nto, self.nreplies, self.nreferences, self.nto, self.ncc,
                             self.email_xml,
@@ -465,6 +466,8 @@ The script that rendered this data publication is on the script/ directory.\n:::
             c("-|-|-|-| corrected fromstring:", fromstring)
         if fromstring.count(">") == fromstring.count("<") > 0:
             name, email = re.findall(r"(.*?) {0,1}<(.*?)>", fromstring)[0]
+            if not email:
+                name, email = re.findall(r"(.*?) {0,1}<(.*?)>", fromstring)[1]
         elif "(" in fromstring:
             email, name = re.findall(r"(.*?) {0,1}\((.*)\)", fromstring)[0]
         elif " " in fromstring:
