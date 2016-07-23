@@ -129,7 +129,7 @@ class MboxPublishing:
                 replymessageuri = P.rdf.ic(po.LostEmailMessage, replyid, self.translation_graph, self.snapshoturi)
                 triples.extend((
                          (replymessageuri, a, po.EmailMessage),
-                         (replymessageuri, NS.rdfs.comment, "This message registered as having a reply,  but the field might be ill-formed: "+replyid_),
+                         (replymessageuri, po.comment, "This message registered as having a reply,  but the field might be ill-formed: "+replyid_),
                          (messageuri, po.replyTo, replymessageuri),
                 ))
             elif saneid:
@@ -182,12 +182,12 @@ class MboxPublishing:
                 nchars = len(text)
                 # ntokens = len(k.wordpunct_tokenize(text))
                 # nsentences = len(k.sent_tokenize(text))
-                self.nchars_all += [nchars]
+                # self.nchars_all += [nchars]
                 # self.ntokens_all += [ntokens]
                 # self.nsentences_all += [nsentences]
                 triples.extend((
                          (messageuri, po.text, text),
-                         (messageuri, po.nChars, nchars),
+                         # (messageuri, po.nChars, nchars),
                          # (messageuri, po.nTokens, ntokens),
                          # (messageuri, po.nSentences, nsentences),
                 ))
@@ -202,7 +202,7 @@ class MboxPublishing:
                 # self.nsentences_clean_all += [nsentences_clean]
                 triples.extend((
                          (messageuri, po.cleanText, clean_text),
-                         (messageuri, po.nCharsClean, nchars_clean),
+                         # (messageuri, po.nCharsClean, nchars_clean),
                          # (messageuri, po.nTokensClean, ntokens_clean),
                          # (messageuri, po.nSentencesClean, nsentences_clean),
                 ))

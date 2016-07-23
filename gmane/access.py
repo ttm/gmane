@@ -19,7 +19,7 @@ def parseLegacyFiles(data_dir=DATADIR):
             if not foo:
                 foo = "0"
             snapshotid = re.sub('^gmane', 'gmane-legacy-', directory)+foo+"-"+all_files[-1].lstrip("0")
-            snapshoturi = po.GmaneSnapshot+"#"+snapshotid
+            snapshoturi = po.Snapshot+"#"+snapshotid
             expressed_classes = [po.GmaneParticipant, po.EmailPeer, po.EmailMessage]
             expressed_reference = directory
             name_humanized = "Gmane email list with id "+expressed_reference
