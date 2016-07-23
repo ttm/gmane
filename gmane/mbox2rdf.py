@@ -186,7 +186,7 @@ class MboxPublishing:
                 # self.ntokens_all += [ntokens]
                 # self.nsentences_all += [nsentences]
                 triples.extend((
-                         (messageuri, po.messageText, text),
+                         (messageuri, po.text, text),
                          (messageuri, po.nChars, nchars),
                          # (messageuri, po.nTokens, ntokens),
                          # (messageuri, po.nSentences, nsentences),
@@ -201,7 +201,7 @@ class MboxPublishing:
                 # self.ntokens_clean_all += [ntokens_clean]
                 # self.nsentences_clean_all += [nsentences_clean]
                 triples.extend((
-                         (messageuri, po.messageTextClean, clean_text),
+                         (messageuri, po.cleanText, clean_text),
                          (messageuri, po.nCharsClean, nchars_clean),
                          # (messageuri, po.nTokensClean, ntokens_clean),
                          # (messageuri, po.nSentencesClean, nsentences_clean),
@@ -277,105 +277,107 @@ class MboxPublishing:
             mbox.close()
 
     def makeMetadata(self):
+        triples = P.get(self.snapshoturi, None, None, self.gmane_graph)
         self.totalchars = sum(self.nchars_all)
         self.mchars_messages = n.mean(self.nchars_all)
         self.dchars_messages = n.std(self.nchars_all)
-        self.totaltokens = sum(self.ntokens_all)
-        self.mtokens_messages = n.mean(self.ntokens_all)
-        self.dtokens_messages = n.std(self.ntokens_all)
-        self.totalsentences = sum(self.nsentences_all)
-        self.msentences_messages = n.mean(self.nsentences_all)
-        self.dsentences_messages = n.std(self.nsentences_all)
+        # self.totaltokens = sum(self.ntokens_all)
+        # self.mtokens_messages = n.mean(self.ntokens_all)
+        # self.dtokens_messages = n.std(self.ntokens_all)
+        # self.totalsentences = sum(self.nsentences_all)
+        # self.msentences_messages = n.mean(self.nsentences_all)
+        # self.dsentences_messages = n.std(self.nsentences_all)
 
         self.totalchars_clean = sum(self.nchars_clean_all)
         self.mchars_messages_clean = n.mean(self.nchars_clean_all)
         self.dchars_messages_clean = n.std(self.nchars_clean_all)
-        self.totaltokens_clean = sum(self.ntokens_clean_all)
-        self.mtokens_messages_clean = n.mean(self.ntokens_clean_all)
-        self.dtokens_messages_clean = n.std(self.ntokens_clean_all)
-        self.totalsentences_clean = sum(self.nsentences_clean_all)
-        self.msentences_messages_clean = n.mean(self.nsentences_clean_all)
-        self.dsentences_messages_clean = n.std(self.nsentences_clean_all)
-        fremoved_lines = self.nremoved_lines/self.nlines
+        # self.totaltokens_clean = sum(self.ntokens_clean_all)
+        # self.mtokens_messages_clean = n.mean(self.ntokens_clean_all)
+        # self.dtokens_messages_clean = n.std(self.ntokens_clean_all)
+        # self.totalsentences_clean = sum(self.nsentences_clean_all)
+        # self.msentences_messages_clean = n.mean(self.nsentences_clean_all)
+        # self.dsentences_messages_clean = n.std(self.nsentences_clean_all)
+        # fremoved_lines = self.nremoved_lines/self.nlines
 
-        triples = [
-                (self.snapshoturi, po.nParticipants,           self.nparticipants),
-                (self.snapshoturi, po.nMessages,                 self.nmessages),
-                (self.snapshoturi, po.nEmptyMessages,                 self.nempty),
-                (self.snapshoturi, po.nReplies,              self.nreplies),
-                (self.snapshoturi, po.nCC,                 self.ncc),
-                (self.snapshoturi, po.nTo,              self.nto),
-                (self.snapshoturi, po.nReferences,               self.nreferences),
-                (self.snapshoturi, po.nUrls,               self.nurls),
-                (self.snapshoturi, po.nCharsOverall, self.totalchars),
-                (self.snapshoturi, po.mCharsOverall, self.mchars_messages),
-                (self.snapshoturi, po.dCharsOverall, self.dchars_messages),
-                (self.snapshoturi, po.nTokensOverall, self.totaltokens),
-                (self.snapshoturi, po.mTokensOverall, self.mtokens_messages),
-                (self.snapshoturi, po.dTokensOverall, self.dtokens_messages),
-                (self.snapshoturi, po.nSentencesOverall, self.totalsentences),
-                (self.snapshoturi, po.mSentencesOverall, self.msentences_messages),
-                (self.snapshoturi, po.dSentencesOverall, self.dsentences_messages),
+        triples += [
+                # (self.snapshoturi, po.numberOfParticipants,           self.nparticipants),
+                # (self.snapshoturi, po.numberOfMessages,                 self.nmessages),
+                (self.snapshoturi, po.numberOfEmptyMessages,                 self.nempty),
+                # (self.snapshoturi, po.numberOfReplies,              self.nreplies),
+                # (self.snapshoturi, po.numberOfCC,                 self.ncc),
+                # (self.snapshoturi, po.numberOfTo,              self.nto),
+                # (self.snapshoturi, po.numberOfReferences,               self.nreferences),
+                # (self.snapshoturi, po.numberOfUrls,               self.nurls),
+                # (self.snapshoturi, po.numberOfChars, self.totalchars),
+                # (self.snapshoturi, po.meanChars, self.mchars_messages),
+                # (self.snapshoturi, po.deviationChars, self.dchars_messages),
+                # (self.snapshoturi, po.numberOfTokens, self.totaltokens),
+                # (self.snapshoturi, po.meanTokens, self.mtokens_messages),
+                # (self.snapshoturi, po.deviationTokens, self.dtokens_messages),
+                # (self.snapshoturi, po.numberOfSentences, self.totalsentences),
+                # (self.snapshoturi, po.meanSentences, self.msentences_messages),
+                # (self.snapshoturi, po.deviationSentences, self.dsentences_messages),
 
-                (self.snapshoturi,  po.nCharsOverallClean,      self.totalchars_clean),
-                (self.snapshoturi,  po.mCharsOverallClean,  self.mchars_messages_clean),
-                (self.snapshoturi,  po.dCharsOverallClean,  self.dchars_messages_clean),
-                (self.snapshoturi, po.nTokensOverallClean,     self.totaltokens_clean),
-                (self.snapshoturi, po.mTokensOverallClean, self.mtokens_messages_clean),
-                (self.snapshoturi, po.dTokensOverallClean, self.dtokens_messages_clean),
-                (self.snapshoturi, po.nSentencesOverallClean,     self.totalsentences_clean),
-                (self.snapshoturi, po.mSentencesOverallClean, self.msentences_messages_clean),
-                (self.snapshoturi, po.dSentencesOverallClean, self.dsentences_messages_clean),
-                (self.snapshoturi, po.fRemovedLines, fremoved_lines),
+                # (self.snapshoturi,  po.numberOfCharsClean,      self.totalchars_clean),
+                # (self.snapshoturi,  po.meanCharsClean,  self.mchars_messages_clean),
+                # (self.snapshoturi,  po.deviationCharsClean,  self.dchars_messages_clean),
+                # (self.snapshoturi, po.numberOfTokensClean,     self.totaltokens_clean),
+                # (self.snapshoturi, po.meanTokensClean, self.mtokens_messages_clean),
+                # (self.snapshoturi, po.deviationTokensClean, self.dtokens_messages_clean),
+                # (self.snapshoturi, po.numberOfSentencesClean,     self.totalsentences_clean),
+                # (self.snapshoturi, po.meanSentencesClean, self.msentences_messages_clean),
+                # (self.snapshoturi, po.deviationSentencesClean, self.dsentences_messages_clean),
+                # (self.snapshoturi, po.fractionOfRemovedLines, fremoved_lines),
                 ]
         P.add(triples, context=self.meta_graph)
-        P.rdf.triplesScaffolding(self.snapshoturi,
-                                 [po.gmaneParticipantAttribute]*len(self.participantvars),
-                                 self.participantvars, context=self.meta_graph)
-        P.rdf.triplesScaffolding(self.snapshoturi,
-                                 [po.gmaneMessageAttribute]*len(self.messagevars),
-                                 self.messagevars, context=self.meta_graph)
-        P.rdf.triplesScaffolding(self.snapshoturi,
-                                 [po.emailXMLFilename]*len(self.email_xml)+[po.emailTTLFilename]*len(self.email_ttl),
-                                 self.email_xml+self.email_ttl, context=self.meta_graph)
-        P.rdf.triplesScaffolding(self.snapshoturi,
-                                 [po.onlineEmailXMLFile]*len(self.email_xml)+[po.onlineEmailTTLFile]*len(self.email_ttl),
-                                 [self.online_prefix+i for i in self.email_xml+self.email_ttl], context=self.meta_graph)
+        # P.rdf.triplesScaffolding(self.snapshoturi,
+        #                          [po.gmaneParticipantAttribute]*len(self.participantvars),
+        #                          self.participantvars, context=self.meta_graph)
+        # P.rdf.triplesScaffolding(self.snapshoturi,
+        #                          [po.gmaneMessageAttribute]*len(self.messagevars),
+        #                          self.messagevars, context=self.meta_graph)
+        # P.rdf.triplesScaffolding(self.snapshoturi,
+        #                          [po.emailXMLFilename]*len(self.email_xml)+[po.emailTTLFilename]*len(self.email_ttl),
+        #                          self.email_xml+self.email_ttl, context=self.meta_graph)
+        # P.rdf.triplesScaffolding(self.snapshoturi,
+        #                          [po.onlineEmailXMLFile]*len(self.email_xml)+[po.onlineEmailTTLFile]*len(self.email_ttl),
+        #                          [self.online_prefix+i for i in self.email_xml+self.email_ttl], context=self.meta_graph)
         self.mrdf = self.snapshotid+"Meta.rdf"
         self.mttl = self.snapshotid+"Meta.ttl"
         self.desc = "gmane public email list dataset with snapshotID: {}\nsnapshotURI: {} \nisEgo: {}. isGroup: {}.".format(
                                                 self.snapshotid, self.snapshoturi, self.isego, self.isgroup, )
         self.desc += "\nisFriendship: {}; ".format(self.isfriendship)
         self.desc += "isInteraction: {}.".format(self.isinteraction)
-        self.desc += "\nnParticipants: {}; nInteractions: {} (replies+references+cc+to).".format(
-            self.nparticipants, self.nreplies+self.nreferences+self.ncc+self.nto)
-        self.desc += "\nisPost: {} (alias hasText: {})".format(self.hastext, self.hastext)
-        self.desc += "\nnMessages: {} (+ empty: {}); ".format(self.nmessages, self.nempty)
-        self.desc += "nReplies: {}; nReferences: {}; nTo {}; nCC: {}.".format(self.nreplies, self.nreferences, self.ncc, self.nto)
-        self.desc += "\nnChars: {}; mChars: {}; dChars: {}.".format(self.totalchars, self.mchars_messages, self.dchars_messages)
-        self.desc += "\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens, self.mtokens_messages, self.dtokens_messages)
-        self.desc += "\nnSentences: {}; mSentences: {}; dSentences: {}.".format(self.totalsentences, self.msentences_messages, self.dsentences_messages)
-        self.desc += "\nnCharsClean: {}; mCharsClean: {}; dCharsClean: {}.".format(self.totalchars_clean, self.mchars_messages_clean, self.dchars_messages_clean)
-        self.desc += "\nnTokensClean: {}; mTokensClean: {}; dTokensClean: {};".format(self.totaltokens_clean, self.mtokens_messages_clean, self.dtokens_messages_clean)
-        self.desc += "\nnSentencesClean: {}; mSentencesClean: {}; dSentencesClean: {}.".format(self.totalsentences_clean, self.msentences_messages_clean, self.dsentences_messages_clean)
-        self.desc += "\nnUrls: {};  fRemovedLines {};.".format(self.nurls, fremoved_lines)
+        # self.desc += "\nnParticipants: {}; nInteractions: {} (replies+references+cc+to).".format(
+        #     self.nparticipants, self.nreplies+self.nreferences+self.ncc+self.nto)
+        self.desc += "\nisPost: {}".format(self.hastext)
+        # self.desc += "\nnMessages: {} (+ empty: {}); ".format(self.nmessages, self.nempty)
+        # self.desc += "nReplies: {}; nReferences: {}; nTo {}; nCC: {}.".format(self.nreplies, self.nreferences, self.ncc, self.nto)
+        # self.desc += "\nnumberOfChars: {}; meanChars: {}; deviationChars: {}.".format(self.totalchars, self.mchars_messages, self.dchars_messages)
+        # self.desc += "\nnTokens: {}; mTokens: {}; dTokens: {};".format(self.totaltokens, self.mtokens_messages, self.dtokens_messages)
+        # self.desc += "\nnSentences: {}; mSentences: {}; dSentences: {}.".format(self.totalsentences, self.msentences_messages, self.dsentences_messages)
+        # self.desc += "\nnumberOfCharsClean: {}; meanCharsClean: {}; deviationCharsClean: {}.".format(self.totalchars_clean, self.mchars_messages_clean, self.dchars_messages_clean)
+        # self.desc += "\nnTokensClean: {}; mTokensClean: {}; dTokensClean: {};".format(self.totaltokens_clean, self.mtokens_messages_clean, self.dtokens_messages_clean)
+        # self.desc += "\nnSentencesClean: {}; mSentencesClean: {}; dSentencesClean: {}.".format(self.totalsentences_clean, self.msentences_messages_clean, self.dsentences_messages_clean)
+        # self.desc += "\nnumberOfUrls: {}"  # ;  fRemovedLines {};.".format(self.nurls, fremoved_lines)
         self.ntriples = len(P.context(self.translation_graph))
         triples = [
                 (self.snapshoturi, po.triplifiedIn,      datetime.datetime.now()),
-                (self.snapshoturi, po.triplifiedBy,      "scripts/"),
-                (self.snapshoturi, po.donatedBy,         self.snapshotid),
-                (self.snapshoturi, po.availableAt,       self.online_prefix),
-                (self.snapshoturi, po.onlineMetaXMLFile, self.online_prefix+self.mrdf),
-                (self.snapshoturi, po.onlineMetaTTLFile, self.online_prefix+self.mttl),
-                (self.snapshoturi, po.metaXMLFileName,   self.mrdf),
-                (self.snapshoturi, po.metaTTLFileName,   self.mttl),
-                (self.snapshoturi, po.totalXMLFileSizeMB, sum(self.size_xml)),
-                (self.snapshoturi, po.totalTTLFileSizeMB, sum(self.size_ttl)),
+                # (self.snapshoturi, po.triplifiedBy,      "scripts/"),
+                # (self.snapshoturi, po.donatedBy,         self.snapshotid),
+                # (self.snapshoturi, po.availableAt,       self.online_prefix),
+                # (self.snapshoturi, po.onlineMetaXMLFile, self.online_prefix+self.mrdf),
+                # (self.snapshoturi, po.onlineMetaTTLFile, self.online_prefix+self.mttl),
+                # (self.snapshoturi, po.metaXMLFileName,   self.mrdf),
+                # (self.snapshoturi, po.metaTTLFileName,   self.mttl),
+                # (self.snapshoturi, po.totalXMLFileSizeMB, sum(self.size_xml)),
+                # (self.snapshoturi, po.totalTTLFileSizeMB, sum(self.size_ttl)),
                 (self.snapshoturi, po.acquiredThrough,   "Gmane public mailing list archive RSS feed"),
-                (self.snapshoturi, po.socialProtocolTag, "Gmane"),
-                (self.snapshoturi, po.socialProtocol,    P.rdf.ic(po.Platform, "Gmane", self.meta_graph, self.snapshoturi)),
-                (self.snapshoturi, po.nTriples,         self.ntriples),
-                (self.snapshoturi, NS.rdfs.comment,         self.desc),
+                (self.snapshoturi, po.socialProtocol, "Gmane"),
+                # (self.snapshoturi, po.socialProtocolTag, "Gmane"),
+                # (self.snapshoturi, po.socialProtocol,    P.rdf.ic(po.Platform, "Gmane", self.meta_graph, self.snapshoturi)),
+                # (self.snapshoturi, po.numberOfTriples,         self.ntriples),
+                (self.snapshoturi, po.comment,         self.desc),
                 (self.snapshoturi, po.gmaneID, self.directory),
                 ]
         P.add(triples, context=self.meta_graph)
@@ -383,11 +385,11 @@ class MboxPublishing:
     def writeAllGmane(self):
         g = P.context(self.meta_graph)
         g.namespace_manager.bind("po", po)
-        ntriples = len(g)
-        triples = [
-                 (self.snapshoturi, po.nMetaTriples, ntriples),
-                 ]
-        P.add(triples, context=self.meta_graph)
+        # ntriples = len(g)
+        # triples = [
+        #          (self.snapshoturi, po.nMetaTriples, ntriples),
+        #          ]
+        # P.add(triples, context=self.meta_graph)
         g.namespace_manager.bind("po", po)
         g.serialize(self.final_path_+self.snapshotid+"Meta.ttl", "turtle")
         c("ttl")
@@ -450,9 +452,9 @@ The script that rendered this data publication is on the script/ directory.\n:::
                 ava=self.online_prefix,
                 desc=self.desc
                 ))
-        triples = [
-                (self.snapshotid, po.published, True),
-                ]
+        # triples = [
+        #         (self.snapshotid, po.published, True),
+        #         ]
 
     def parseParticipant(self, fromstring):
         fromstring = decodeHeader(fromstring)

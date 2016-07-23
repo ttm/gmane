@@ -28,22 +28,22 @@ def parseLegacyFiles(data_dir=DATADIR):
             directoryuri = po.Directory+"#gmane-"+directory
             triples.extend([
                      (snapshoturi, a, po.Snapshot),
-                     (snapshoturi, a, po.GmaneSnapshot),
-                     (snapshoturi, po.dataDir, data_dir),
+                     # (snapshoturi, a, po.GmaneSnapshot),
+                     # (snapshoturi, po.dataDir, data_dir),
                      (snapshoturi, po.snapshotID, snapshotid),
                      (snapshoturi, po.isEgo, False),
                      (snapshoturi, po.isGroup, True),
                      (snapshoturi, po.isFriendship, False),
                      (snapshoturi, po.isInteraction, True),
                      (snapshoturi, po.isPost, True),
-                     (snapshoturi, po.humanizedName, name_humanized),
-                     (snapshoturi, po.expressedReference, expressed_reference),
-                     (snapshoturi, po.rawDirectory, directoryuri),
-                     (directoryuri,     po.directorySize, directorysize),
-                     (directoryuri,     po.directoryName, directory),
-                     (directoryuri,     po.fileFormat, fileformat),
+                     # (snapshoturi, po.humanizedName, name_humanized),
+                     # (snapshoturi, po.expressedReference, expressed_reference),
+                     # (snapshoturi, po.rawDirectory, directoryuri),
+                     # (directoryuri,     po.directorySize, directorysize),
+                     # (directoryuri,     po.directoryName, directory),
+                     # (directoryuri,     po.fileFormat, fileformat),
                      ]+[
-                     (directoryuri,    po.expressedClass, expressed_class) for expressed_class in expressed_classes
+                     # (directoryuri,    po.expressedClass, expressed_class) for expressed_class in expressed_classes
                      ])
             snapshots.add(snapshoturi)
     nsnapshots = ndirectories = len(directories)
