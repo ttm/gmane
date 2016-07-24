@@ -29,7 +29,7 @@ def parseLegacyFiles(data_dir=DATADIR):
             triples.extend([
                      (snapshoturi, a, po.Snapshot),
                      # (snapshoturi, a, po.GmaneSnapshot),
-                     # (snapshoturi, po.dataDir, data_dir),
+                     (snapshoturi, po.dataDir, data_dir),
                      (snapshoturi, po.snapshotID, snapshotid),
                      (snapshoturi, po.isEgo, False),
                      (snapshoturi, po.isGroup, True),
@@ -38,9 +38,9 @@ def parseLegacyFiles(data_dir=DATADIR):
                      (snapshoturi, po.isPost, True),
                      # (snapshoturi, po.humanizedName, name_humanized),
                      # (snapshoturi, po.expressedReference, expressed_reference),
-                     # (snapshoturi, po.rawDirectory, directoryuri),
+                     (snapshoturi, po.rawDirectory, directoryuri),
                      # (directoryuri,     po.directorySize, directorysize),
-                     # (directoryuri,     po.directoryName, directory),
+                     (directoryuri,     po.directoryName, directory),
                      # (directoryuri,     po.fileFormat, fileformat),
                      ]+[
                      # (directoryuri,    po.expressedClass, expressed_class) for expressed_class in expressed_classes

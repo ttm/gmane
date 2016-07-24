@@ -8,7 +8,7 @@ def publishAll(snapshoturis=None):
     if not snapshoturis:
         c("getting email snapshots, implementation needs verification TTM")
         uridict = {}
-        for snapshoturi in P.get(None, a, NS.po.GmaneSnapshot, minimized=True):
+        for snapshoturi in P.get(None, a, NS.po.Snapshot, minimized=True):
             uridict[snapshoturi] = 0
             for rawFile in P.get(snapshoturi, NS.po.rawFile, strict=True, minimized=True):
                 uridict[snapshoturi] += P.get(rawFile, NS.po.directorySize, minimized=True).toPython()

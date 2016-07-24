@@ -363,6 +363,14 @@ class MboxPublishing:
         self.ntriples = len(P.context(self.translation_graph))
         triples = [
                 (self.snapshoturi, po.triplifiedIn,      datetime.datetime.now()),
+                 (self.snapshoturi, a, po.Snapshot),
+                 (self.snapshoturi, po.snapshotID, self.snapshotid),
+                 (self.snapshoturi, po.isEgo, False),
+                 (self.snapshoturi, po.isGroup, True),
+                 (self.snapshoturi, po.isFriendship, False),
+                 (self.snapshoturi, po.isInteraction, True),
+                 (self.snapshoturi, po.isPost, True),
+                 (self.snapshoturi, po.socialProtocol, 'Email'),
                 # (self.snapshoturi, po.triplifiedBy,      "scripts/"),
                 # (self.snapshoturi, po.donatedBy,         self.snapshotid),
                 # (self.snapshoturi, po.availableAt,       self.online_prefix),
