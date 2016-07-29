@@ -114,7 +114,9 @@ class MboxPublishing:
                      (participanturi, po.emailAddress, email),
             ))
             if name:
-                triples.append((participanturi, po.name, name))
+                obs = P.rdf.ic(po.Observation, self.snapshotid+'-'+email, self.translation_graph, self.snapshoturi)
+                triples.extend([(participanturi, po.observation, obs),
+                    (obs, po.name, name)])
             subject = message["Subject"]
             if subject:
                 subject = decodeHeader(subject)
@@ -277,7 +279,7 @@ class MboxPublishing:
             mbox.close()
 
     def makeMetadata(self):
-        triples = P.get(self.snapshoturi, None, None, self.gmane_graph)
+        # triples = P.get(self.snapshoturi, None, None, self.gmane_graph)
         self.totalchars = sum(self.nchars_all)
         self.mchars_messages = n.mean(self.nchars_all)
         self.dchars_messages = n.std(self.nchars_all)
@@ -299,7 +301,7 @@ class MboxPublishing:
         # self.dsentences_messages_clean = n.std(self.nsentences_clean_all)
         # fremoved_lines = self.nremoved_lines/self.nlines
 
-        triples += [
+        triples = [
                 # (self.snapshoturi, po.numberOfParticipants,           self.nparticipants),
                 # (self.snapshoturi, po.numberOfMessages,                 self.nmessages),
                 (self.snapshoturi, po.numberOfEmptyMessages,                 self.nempty),
@@ -360,7 +362,7 @@ class MboxPublishing:
         # self.desc += "\nnTokensClean: {}; mTokensClean: {}; dTokensClean: {};".format(self.totaltokens_clean, self.mtokens_messages_clean, self.dtokens_messages_clean)
         # self.desc += "\nnSentencesClean: {}; mSentencesClean: {}; dSentencesClean: {}.".format(self.totalsentences_clean, self.msentences_messages_clean, self.dsentences_messages_clean)
         # self.desc += "\nnumberOfUrls: {}"  # ;  fRemovedLines {};.".format(self.nurls, fremoved_lines)
-        self.ntriples = len(P.context(self.translation_graph))
+        # self.ntriples = len(P.context(self.translation_graph))
         triples = [
                 (self.snapshoturi, po.triplifiedIn,      datetime.datetime.now()),
                  (self.snapshoturi, a, po.Snapshot),
@@ -381,7 +383,7 @@ class MboxPublishing:
                 # (self.snapshoturi, po.totalXMLFileSizeMB, sum(self.size_xml)),
                 # (self.snapshoturi, po.totalTTLFileSizeMB, sum(self.size_ttl)),
                 (self.snapshoturi, po.acquiredThrough,   "Gmane public mailing list archive RSS feed"),
-                (self.snapshoturi, po.socialProtocol, "Gmane"),
+                # (self.snapshoturi, po.socialProtocol, "Gmane"),
                 # (self.snapshoturi, po.socialProtocolTag, "Gmane"),
                 # (self.snapshoturi, po.socialProtocol,    P.rdf.ic(po.Platform, "Gmane", self.meta_graph, self.snapshoturi)),
                 # (self.snapshoturi, po.numberOfTriples,         self.ntriples),
@@ -404,65 +406,65 @@ class MboxPublishing:
         g.serialize(self.final_path_+self.snapshotid+"Meta.rdf", "xml")
         c("serialized meta")
         # copia o script que gera este codigo
-        if not os.path.isdir(self.final_path_+"scripts"):
-            os.mkdir(self.final_path_+"scripts")
-        shutil.copy(G.PACKAGEDIR+"/../tests/triplify.py", self.final_path_+"scripts/triplify.py")
-        # copia do base data
-        tinteraction = """\n\n{} individuals with metadata {}
-and {} interactions (replies: {}, references: {}, to: {}, cc: {})
-constitute the interaction
-structure in the RDF/XML file(s):
-{}
-and the Turtle file(s):
-    {}
-(anonymized: {}).""".format(self.nparticipants, str(self.participantvars),
-                            self.nreplies+self.nreferences+self.ncc+self.nto, self.nreplies, self.nreferences, self.nto, self.ncc,
-                            self.email_xml,
-                            self.email_ttl,
-                            self.interactions_anonymized)
-        tposts = """\n\nThe dataset consists of {} messages with metadata {}
-{:.3f} characters in average (std: {:.3f}) and total chars in snapshot: {}
-{:.3f} tokens in average (std: {:.3f}) and total tokens in snapshot: {}""".format(
-                        self.nmessages, str(self.messagevars),
-                        self.mchars_messages, self.dchars_messages, self.totalchars,
-                        self.mtokens_messages, self.dtokens_messages, self.totaltokens,
-                        )
-        # self.dates = [i.isoformat() for i in self.dates]
-        date1 = 0 # min(self.dates)
-        date2 = 0 # max(self.dates)
-        with open(self.final_path_+"README", "w") as f:
-            f.write("""::: Open Linked Social Data publication
-\nThis repository is a RDF data expression of the gmane public email list with
-snapshot {snapid} with emails from {date1} to {date2}
-(total of {ntrip} triples).{tinteraction}{tposts}
-\nMetadata for discovery in the RDF/XML file:
-{mrdf} \nor in the Turtle file:\n{mttl}
-\nEgo network: {ise}
-Group network: {isg}
-Friendship network: {isf}
-Interaction network: {isi}
-Has text/posts: {ist}
-\nAll files should be available at the git repository:
-{ava}
-\n{desc}
-
-The script that rendered this data publication is on the script/ directory.\n:::""".format(
-                snapid=self.snapshotid, date1=date1, date2=date2, ntrip=self.ntriples,
-                tinteraction=tinteraction,
-                tposts=tposts,
-                mrdf=self.mrdf,
-                mttl=self.mttl,
-                ise=self.isego,
-                isg=self.isgroup,
-                isf=self.isfriendship,
-                isi=self.isinteraction,
-                ist=self.hastext,
-                ava=self.online_prefix,
-                desc=self.desc
-                ))
-        # triples = [
-        #         (self.snapshotid, po.published, True),
-        #         ]
+#        if not os.path.isdir(self.final_path_+"scripts"):
+#            os.mkdir(self.final_path_+"scripts")
+#        shutil.copy(G.PACKAGEDIR+"/../tests/triplify.py", self.final_path_+"scripts/triplify.py")
+#        # copia do base data
+#        tinteraction = """\n\n{} individuals with metadata {}
+#and {} interactions (replies: {}, references: {}, to: {}, cc: {})
+#constitute the interaction
+#structure in the RDF/XML file(s):
+#{}
+#and the Turtle file(s):
+#    {}
+#(anonymized: {}).""".format(self.nparticipants, str(self.participantvars),
+#                            self.nreplies+self.nreferences+self.ncc+self.nto, self.nreplies, self.nreferences, self.nto, self.ncc,
+#                            self.email_xml,
+#                            self.email_ttl,
+#                            self.interactions_anonymized)
+#        tposts = """\n\nThe dataset consists of {} messages with metadata {}
+#{:.3f} characters in average (std: {:.3f}) and total chars in snapshot: {}
+#{:.3f} tokens in average (std: {:.3f}) and total tokens in snapshot: {}""".format(
+#                        self.nmessages, str(self.messagevars),
+#                        self.mchars_messages, self.dchars_messages, self.totalchars,
+#                        self.mtokens_messages, self.dtokens_messages, self.totaltokens,
+#                        )
+#        # self.dates = [i.isoformat() for i in self.dates]
+#        date1 = 0 # min(self.dates)
+#        date2 = 0 # max(self.dates)
+#        with open(self.final_path_+"README", "w") as f:
+#            f.write("""::: Open Linked Social Data publication
+#\nThis repository is a RDF data expression of the gmane public email list with
+#snapshot {snapid} with emails from {date1} to {date2}
+#(total of {ntrip} triples).{tinteraction}{tposts}
+#\nMetadata for discovery in the RDF/XML file:
+#{mrdf} \nor in the Turtle file:\n{mttl}
+#\nEgo network: {ise}
+#Group network: {isg}
+#Friendship network: {isf}
+#Interaction network: {isi}
+#Has text/posts: {ist}
+#\nAll files should be available at the git repository:
+#{ava}
+#\n{desc}
+#
+#The script that rendered this data publication is on the script/ directory.\n:::""".format(
+#                snapid=self.snapshotid, date1=date1, date2=date2, ntrip=self.ntriples,
+#                tinteraction=tinteraction,
+#                tposts=tposts,
+#                mrdf=self.mrdf,
+#                mttl=self.mttl,
+#                ise=self.isego,
+#                isg=self.isgroup,
+#                isf=self.isfriendship,
+#                isi=self.isinteraction,
+#                ist=self.hastext,
+#                ava=self.online_prefix,
+#                desc=self.desc
+#                ))
+#        # triples = [
+#        #         (self.snapshotid, po.published, True),
+#        #         ]
 
     def parseParticipant(self, fromstring):
         fromstring = decodeHeader(fromstring)

@@ -9,7 +9,7 @@ from percolation.rdf import c
 # ss=G.access.parseLegacyFiles()
 ss = G.access.parseLegacyFiles("/home/r/.gmane4/")
 # ss = [i for i in ss if 'users' in i or 'metar' in i]
-c("finished .gmane", ss)
+# c("finished .gmane", ss)
 # ss.union(G.access.parseLegacyFiles("/home/r/.gmane2/")); c("finished .gmane2")
 # ss.union(G.access.parseLegacyFiles("/home/r/.gmane3/")); c("finished .gmane3")
 # ss.union(G.access.parseLegacyFiles("/home/r/.gmane4/")); c("finished .gmane4")
