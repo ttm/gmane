@@ -109,14 +109,14 @@ class MboxPublishing:
             #     self.nparticipants += 1
             #     if self.nparticipants == 100:
             #         pass
+            obs = P.rdf.ic(po.Observation, self.snapshotid+'-'+email, self.translation_graph, self.snapshoturi)
             triples.extend((
                      (messageuri, po.author, participanturi),
-                     (participanturi, po.emailAddress, email),
+                     (participanturi, po.observation, obs),
+                     (obs, po.email, email),
             ))
             if name:
-                obs = P.rdf.ic(po.Observation, self.snapshotid+'-'+email, self.translation_graph, self.snapshoturi)
-                triples.extend([(participanturi, po.observation, obs),
-                    (obs, po.name, name)])
+                triples.extend([(obs, po.name, name)])
             subject = message["Subject"]
             if subject:
                 subject = decodeHeader(subject)
